@@ -41,17 +41,17 @@ UART_Receive_Package:
     lfsr    2, pkg_buffer    ; Point FSR2 to the start of our 16-byte RAM
     movlw   16              ; We expect exactly 16 bytes (128 bits)
     movwf   rx_counter, A
-    bsf     CREN, A         ; Ensure Continuous Receive is enabled
+    bsf RCSTA1, 4   ; Enable Continuous Receive
 
 Wait_Byte:
     ; --- Error Checking ---
-    btfsc   OERR, A         ; Check for Overrun Error (data came too fast)
+    btfsc   RCSTA1, 1   ; OERR = bit 1 of RCSTA1
     bra     Handle_Overrun
-    btfsc   FERR, A         ; Check for Framing Error (bad baud rate/noise)
+    btfsc   RCSTA1, 2   ; FERR = bit 2 of RCSTA1
     bra     Handle_Framing
 
     ; --- Wait for Data ---
-    btfss   RC1IF, A        ; Check for bytes in RCREG1
+    btfss   PIR1, 5   ; RC1IF = bit 5 of PIR1
     bra     Wait_Byte       ; Keep polling until a byte is received
 
     ; --- Store Data ---
@@ -64,8 +64,8 @@ Wait_Byte:
     return                  ; Buffer is now full (16 bytes received)
 
 Handle_Overrun:
-    bcf     CREN, A         ; Reset the UART receiver logic
-    bsf     CREN, A
+    bcf     RCSTA1, 4   ; CREN = bit 4 of RCSTA1
+    bsf     RCSTA1, 4
     bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
 
 Handle_Framing:

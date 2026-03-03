@@ -6,6 +6,7 @@ from the PIC before sending the next one.
 
 import os
 import serial
+import serial.tools.list_ports
 
 def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_size=16):
     """
@@ -29,6 +30,11 @@ def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_s
     if not os.path.exists(send_path):
         print(f"Error: File '{send_path}' not found.")
         return
+    
+    with open(r"tester.txt", "rb") as f:
+        data = f.read()
+        print("File length:", len(data))
+        print("File content (hex):", data.hex())
 
     ser = None
     try:
@@ -48,12 +54,16 @@ def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_s
                 if len(send_packet) < packet_size:
                     send_packet = send_packet.ljust(packet_size, b'\x00')
 
+                # Print packet being sent
+                print(f"Sending packet {packet_count + 1}: {send_packet.hex()}")
+
                 # 2. SEND to PIC
                 ser.write(send_packet)
 
                 # 3. RECEIVE response from PIC (Wait for 128 bits back)
                 # Note: We check the first byte for EOT or errors if your PIC uses them
                 recv_packet = ser.read(packet_size)
+                print(f"pkg_buffer content from PIC: {recv_packet.hex()}")
 
                 if len(recv_packet) < packet_size:
                     print(f"Timeout: PIC did not respond to packet {packet_count + 1}.")
@@ -87,7 +97,7 @@ def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_s
             print("Serial port safely closed.")
 
 if __name__ == "__main__":
-    file_send_path = 'to_pic.bin' # pylint: disable=invalid-name
-    file_receive_path = 'from_pic.bin' # pylint: disable=invalid-name
+    file_send_path = 'tester.txt' # pylint: disable=invalid-name
+    file_receive_path = 'tester_out.txt' # pylint: disable=invalid-name
     port = 'COM4' # pylint: disable=invalid-name
     file_exchange(file_send_path, file_receive_path, port)
