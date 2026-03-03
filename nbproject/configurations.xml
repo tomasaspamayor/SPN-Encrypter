@@ -19,7 +19,7 @@
                    projectFiles="true">
       <itemPath>config.s</itemPath>
       <itemPath>main.s</itemPath>
-      <itemPath>DAC_Interrupt.s</itemPath>
+      <itemPath>UART.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
