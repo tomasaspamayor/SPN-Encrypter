@@ -19,7 +19,6 @@
                    projectFiles="true">
       <itemPath>config.s</itemPath>
       <itemPath>main.s</itemPath>
-      <itemPath>DAC_Interrupt.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
