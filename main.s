@@ -1,7 +1,8 @@
 #include <xc.inc>
 
 global  pkg_buffer
-extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, SBOX_Encrypt_Byte, Encrypt_Buffer
+extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
+extrn	SBOX_Encrypt_Byte, Encrypt_Buffer
 extrn	Key_Setup, Mix_Key
 
 ; --- Reserve 16 bytes for the 128-bit packet ---

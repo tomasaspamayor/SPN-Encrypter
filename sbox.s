@@ -105,7 +105,7 @@ SBOX_Encrypt_Byte:
     movwf   TBLPTRL, A      ; Store in TBLPTR low
     movlw   HIGH(SBOX_DATA) ; Get high byte of address
     movwf   TBLPTRH, A      ; Store in TBLPTR high
-    movlw   UPPER(SBOX_DATA) ; Get upper byte of address
+    movlw   (SBOX_DATA >> 16) & 0xFF ; Get upper byte of address
     movwf   TBLPTRU, A      ; Store in TBLPTR upper
     
     ; Add offset (input byte) to base address
