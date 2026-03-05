@@ -18,8 +18,8 @@ Loop:
     lfsr    2, pkg_buffer       ; FSR2 points to start of buffer
     movlw   16                  ; Number of bytes to clear
 Clear_Loop:
-    movwf   POSTINC2            ; Write W=0 (clear) and increment pointer
-    decfsz  WREG, F             ; Decrement counter, skip if zero
+    movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
+    decfsz  WREG, F, A             ; Decrement counter, skip if zero
     bra     Clear_Loop
 
     ; --- Step 1: Receive 16-byte packet from PC ---
