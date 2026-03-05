@@ -22,8 +22,8 @@ Loop:
     movwf   CLEAR_CNT, A        ; Store in counter variable
     movlw   0                   ; Load 0 into WREG for clearing
 Clear_Loop:
-    movwf   POSTINC2, A         ; Write W=0 (clear) and increment pointer
-            decfsz  CLEAR_CNT, F, A          ; Decrement counter, skip if zero
+    movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
+    decfsz  WREG, F, A             ; Decrement counter, skip if zero
     bra     Clear_Loop
 
     ; --- Step 1: Receive 16-byte packet from PC ---
