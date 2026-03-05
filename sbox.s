@@ -4,6 +4,7 @@
 ; We will use the Rinjael S-Box, which is a well-known S-Box used in the AES encryption standard.
 ; There will be a symmetrical file to decrypt the message, which will use the inverse of the Rinjael S-Box.
 
+global  SBOX_Encrypt_Byte, Encrypt_Buffer
 extrn   pkg_buffer
 
 ; Define your custom registers in the variable section
