@@ -6,7 +6,6 @@ from the PIC before sending the next one.
 
 import os
 import serial
-import serial.tools.list_ports
 
 def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_size=16):
     """
@@ -27,55 +26,51 @@ def file_exchange(send_path, receive_path, serial_port, baud_rate=9600, packet_s
         IOError: If there are issues reading/writing to the local drive.
     """
 
+    # --- 1. READ: Convert the input hex-string file into actual binary data ---
     if not os.path.exists(send_path):
         print(f"Error: File '{send_path}' not found.")
         return
-    
-    with open(r"tester.txt", "rb") as f:
-        data = f.read()
-        print("File length:", len(data))
-        print("File content (hex):", data.hex())
+
+    try:
+        with open(send_path, "r", encoding="utf-8") as f:
+            raw_text = f.read()
+            # Remove spaces/newlines and convert to actual bytes
+            data = bytes.fromhex("".join(raw_text.split()))
+    except ValueError:
+        print("Error: Input file contains invalid hex characters.")
+        return
+
+    print(f"Read {len(data)} binary bytes from hex file.")
 
     ser = None
     try:
         ser = serial.Serial(serial_port, baud_rate, timeout=2)
-        print(f"Connected to {serial_port}. Starting Ping-Pong exchange...")
 
-        with open(send_path, 'rb') as f_send, open(receive_path, 'wb') as f_recv:
+        # --- 2. WRITE: Open the output file in TEXT mode to save hex strings ---
+        with open(receive_path, 'w', encoding="utf-8") as f_recv:
             packet_count = 0
 
-            while True:
-                # 1. READ from local file
-                send_packet = f_send.read(packet_size)
-                if not send_packet:
-                    break  # End of file reached
-
-                # Pad last packet if necessary
+            for i in range(0, len(data), packet_size):
+                send_packet = data[i : i + packet_size]
                 if len(send_packet) < packet_size:
                     send_packet = send_packet.ljust(packet_size, b'\x00')
 
-                # Print packet being sent
-                print(f"Sending packet {packet_count + 1}: {send_packet.hex()}")
-
-                # 2. SEND to PIC
+                # Send raw bytes to hardware
                 ser.write(send_packet)
 
-                # 3. RECEIVE response from PIC (Wait for 128 bits back)
-                # Note: We check the first byte for EOT or errors if your PIC uses them
+                # Read raw bytes from hardware
                 recv_packet = ser.read(packet_size)
-                print(f"pkg_buffer content from PIC: {recv_packet.hex()}")
 
                 if len(recv_packet) < packet_size:
-                    print(f"Timeout: PIC did not respond to packet {packet_count + 1}.")
+                    print(f"Timeout at packet {packet_count + 1}")
                     break
 
-                # 4. WRITE response to local file
-                f_recv.write(recv_packet)
+                # --- 3. CONVERT: Turn binary response back into hex text ---
+                f_recv.write(recv_packet.hex() + "\n")
 
                 packet_count += 1
-                print(f"Exchanged packet {packet_count} (128 bits).")
+                print(f"Exchanged packet {packet_count}")
 
-            # Signal End of Transmission
             ser.write(b'\x04')
             print(f"Exchange complete. {packet_count} packets processed.")
 
