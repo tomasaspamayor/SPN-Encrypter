@@ -4,7 +4,7 @@
 ; We will use the Rinjael S-Box, which is a well-known S-Box used in the AES encryption standard.
 ; There will be a symmetrical file to decrypt the message, which will use the inverse of the Rinjael S-Box.
 
-global  SBOX_Encrypt_Byte, Encrypt_Buffer
+global  SBOX_Encrypt_Byte, Encrypt_Buffer, SBOX_Decrypt_Byte, Decrypt_Buffer
 extrn   pkg_buffer
 
 ; Define your custom registers in the variable section
@@ -88,6 +88,77 @@ SBOX_DATA:
     db      0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 
 ;----------------------------------------------------------
+; Inverse Rijndael S-Box (for decryption)
+; 256-byte lookup table
+; Organization: 16 rows x 16 columns as per standard specification
+;----------------------------------------------------------
+
+SBOX_INVERSE_DATA:
+    ; Row 0x00 - 0x0f
+    db      0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38
+    db      0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb
+    
+    ; Row 0x10 - 0x1f
+    db      0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87
+    db      0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb
+    
+    ; Row 0x20 - 0x2f
+    db      0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d
+    db      0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e
+    
+    ; Row 0x30 - 0x3f
+    db      0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2
+    db      0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25
+    
+    ; Row 0x40 - 0x4f
+    db      0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16
+    db      0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92
+    
+    ; Row 0x50 - 0x5f
+    db      0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda
+    db      0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84
+    
+    ; Row 0x60 - 0x6f
+    db      0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a
+    db      0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06
+    
+    ; Row 0x70 - 0x7f
+    db      0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02
+    db      0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b
+    
+    ; Row 0x80 - 0x8f
+    db      0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea
+    db      0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73
+    
+    ; Row 0x90 - 0x9f
+    db      0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85
+    db      0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e
+    
+    ; Row 0xa0 - 0xaf
+    db      0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89
+    db      0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b
+    
+    ; Row 0xb0 - 0xbf
+    db      0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20
+    db      0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4
+    
+    ; Row 0xc0 - 0xcf
+    db      0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31
+    db      0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f
+    
+    ; Row 0xd0 - 0xdf
+    db      0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d
+    db      0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef
+    
+    ; Row 0xe0 - 0xef
+    db      0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0
+    db      0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61
+    
+    ; Row 0xf0 - 0xff
+    db      0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
+    db      0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
+
+;----------------------------------------------------------
 ; S-Box Byte Encryption Function - FIXED VERSION
 ; Performs byte substitution using Rijndael S-Box
 ;
@@ -156,5 +227,77 @@ Encrypt_Loop:
     ; Decrement counter and loop if not zero
     decfsz  COUNT, F, A
     bra     Encrypt_Loop
+    
+    return
+
+;----------------------------------------------------------
+; Inverse S-Box Byte Decryption Function
+; Performs byte substitution using Inverse Rijndael S-Box
+;
+; Input:  AL = byte to substitute (ciphertext)
+; Output: AL = substituted value (plaintext)
+; Destroys: WREG, TBLPTR, TABLAT
+;----------------------------------------------------------
+SBOX_Decrypt_Byte:
+    ; Get input byte from AL
+    movf    AL, W, A        ; Move AL to WREG
+    movwf   TEMP, A         ; Save in temporary register
+    
+    ; Load base address of Inverse S-Box into TBLPTR
+    movlw   LOW(SBOX_INVERSE_DATA)  ; Get low byte of address
+    movwf   TBLPTRL, A      ; Store in TBLPTR low
+    movlw   HIGH(SBOX_INVERSE_DATA) ; Get high byte of address
+    movwf   TBLPTRH, A      ; Store in TBLPTR high
+    movlw   (SBOX_INVERSE_DATA >> 16) & 0xFF ; Get upper byte of address
+    movwf   TBLPTRU, A      ; Store in TBLPTR upper
+    
+    ; Add offset (input byte) to base address
+    movf    TEMP, W, A      ; Get input byte
+    addwf   TBLPTRL, F, A   ; Add to low byte
+    movlw   0               ; Prepare carry
+    addwfc  TBLPTRH, F, A   ; Add carry to high byte
+    addwfc  TBLPTRU, F, A   ; Add carry to upper byte
+    
+    ; Read substituted value from program memory
+    tblrd*                  ; Read byte at TBLPTR into TABLAT
+    movf    TABLAT, W, A    ; Get the value
+    movwf   AL, A           ; Store result back in AL
+    
+    return
+
+;----------------------------------------------------------
+; Decrypt 16-byte Buffer
+; Decrypts the entire pkg_buffer using Inverse S-Box substitution
+;
+; Input:  pkg_buffer (external) - 16 bytes of ciphertext
+; Output: pkg_buffer - 16 bytes of plaintext (overwritten)
+; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
+;----------------------------------------------------------
+Decrypt_Buffer:
+    ; Set up FSR1 to point to pkg_buffer
+    movlw   LOW(pkg_buffer) ; Get low byte of buffer address
+    movwf   FSR1L, A        ; Store in FSR1 low
+    movlw   HIGH(pkg_buffer) ; Get high byte of buffer address
+    movwf   FSR1H, A        ; Store in FSR1 high
+    
+    ; Initialize counter for 16 bytes
+    movlw   16
+    movwf   COUNT, A
+
+Decrypt_Loop:
+    ; Read byte from buffer
+    movf    INDF1, W, A     ; Get current byte from pkg_buffer
+    movwf   AL, A           ; Store in AL for decryption
+    
+    ; Decrypt the byte
+    call    SBOX_Decrypt_Byte
+    
+    ; Write decrypted byte back to buffer
+    movf    AL, W, A        ; Get decrypted value
+    movwf   POSTINC1, A     ; Store back and increment pointer
+    
+    ; Decrement counter and loop if not zero
+    decfsz  COUNT, F, A
+    bra     Decrypt_Loop
     
     return
