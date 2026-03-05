@@ -48,54 +48,52 @@ class FileTransfer():
             serial.SerialException: If there are issues with the serial connection.
             IOError: If there are issues reading/writing to the local drive.
         """
-
+        # --- 1. READ: Convert the input hex-string file into actual binary data ---
         if not os.path.exists(self.send_path):
             print(f"Error: File '{self.send_path}' not found.")
             return
 
-        # 1. Read and Convert the Hex Text File
         try:
             with open(self.send_path, "r", encoding="utf-8") as f:
-                hex_string = f.read()
-                # Remove whitespace and convert to actual bytes
-                data = bytes.fromhex("".join(hex_string.split()))
+                raw_text = f.read()
+                # Remove spaces/newlines and convert to actual bytes
+                data = bytes.fromhex("".join(raw_text.split()))
         except ValueError:
-            print("Error: File contains invalid Hex characters or an odd number of digits.")
+            print("Error: Input file contains invalid hex characters.")
             return
 
-        print(f"Total binary data to send: {len(data)} bytes")
+        print(f"Read {len(data)} binary bytes from hex file.")
 
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
 
-            # Use 'wb' for the output file
-            with open(self.receive_path, 'wb') as f_recv:
+            # --- 2. WRITE: Open the output file in TEXT mode to save hex strings ---
+            with open(self.receive_path, 'w', encoding="utf-8") as f_recv:
                 packet_count = 0
 
-                # Iterate through 'data' in chunks of packet_size
                 for i in range(0, len(data), self.packet_size):
-                    # Slice the pre-converted binary data
                     send_packet = data[i : i + self.packet_size]
-
-                    # Pad if the last chunk is too small
                     if len(send_packet) < self.packet_size:
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
-                    # SEND to PIC
-                    print(f"Sending packet {packet_count + 1}: {send_packet.hex()}")
+                    # Send raw bytes to hardware
                     ser.write(send_packet)
 
-                    # RECEIVE response
+                    # Read raw bytes from hardware
                     recv_packet = ser.read(self.packet_size)
+
                     if len(recv_packet) < self.packet_size:
-                        print(f"Timeout: PIC failed at packet {packet_count + 1}.")
+                        print(f"Timeout at packet {packet_count + 1}")
                         break
 
-                    f_recv.write(recv_packet)
-                    packet_count += 1
+                    # --- 3. CONVERT: Turn binary response back into hex text ---
+                    f_recv.write(recv_packet.hex() + "\n")
 
-                ser.write(b'\x04') # End of Transmission
+                    packet_count += 1
+                    print(f"Exchanged packet {packet_count}")
+
+                ser.write(b'\x04')
                 print(f"Exchange complete. {packet_count} packets processed.")
 
         except serial.SerialException as e:
