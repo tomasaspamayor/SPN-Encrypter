@@ -88,43 +88,47 @@ SBOX_DATA:
     db      0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 
 ;----------------------------------------------------------
-; S-Box Byte Encryption Function
+; S-Box Byte Encryption Function - FIXED VERSION
 ; Performs byte substitution using Rijndael S-Box
 ;
 ; Input:  AL = byte to substitute
 ; Output: AL = substituted value
-; Destroys: WREG, FSR0
+; Destroys: WREG, TBLPTR, TABLAT
 ;----------------------------------------------------------
 SBOX_Encrypt_Byte:
     ; Get input byte from AL
     movf    AL, W, A        ; Move AL to WREG
     movwf   TEMP, A         ; Save in temporary register
     
-    ; Load base address of S-Box into FSR0
+    ; Load base address of S-Box into TBLPTR
     movlw   LOW(SBOX_DATA)  ; Get low byte of address
-    movwf   FSR0L, A        ; Store in FSR0 low
+    movwf   TBLPTRL, A      ; Store in TBLPTR low
     movlw   HIGH(SBOX_DATA) ; Get high byte of address
-    movwf   FSR0H, A        ; Store in FSR0 high
+    movwf   TBLPTRH, A      ; Store in TBLPTR high
+    movlw   UPPER(SBOX_DATA) ; Get upper byte of address
+    movwf   TBLPTRU, A      ; Store in TBLPTR upper
     
     ; Add offset (input byte) to base address
     movf    TEMP, W, A      ; Get input byte
-    addwf   FSR0L, F, A     ; Add to low byte
+    addwf   TBLPTRL, F, A   ; Add to low byte
     movlw   0               ; Prepare carry
-    addwfc  FSR0H, F, A     ; Add carry to high byte if needed
+    addwfc  TBLPTRH, F, A   ; Add carry to high byte
+    addwfc  TBLPTRU, F, A   ; Add carry to upper byte
     
-    ; Read substituted value
-    movf    INDF0, W, A     ; Read from S-Box
+    ; Read substituted value from program memory
+    tblrd*                  ; Read byte at TBLPTR into TABLAT
+    movf    TABLAT, W, A    ; Get the value
     movwf   AL, A           ; Store result back in AL
     
     return
-
+    
 ;----------------------------------------------------------
 ; Encrypt 16-byte Buffer
 ; Encrypts the entire pkg_buffer using S-Box substitution
 ;
 ; Input:  pkg_buffer (external) - 16 bytes of plaintext
 ; Output: pkg_buffer - 16 bytes of ciphertext (overwritten)
-; Destroys: WREG, FSR0, FSR1, COUNT, AL, TEMP
+; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
 ;----------------------------------------------------------
 Encrypt_Buffer:
     ; Set up FSR1 to point to pkg_buffer
