@@ -3,12 +3,11 @@
 global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	Key_Setup, Mix_Key
+extrn	Shift_Rows, Mix_All_Columns
 
-; --- Reserve 16 bytes for the 128-bit packet ---
 psect  udata_acs
 pkg_buffer:  ds 16
 
-; --- Code section ---
 psect   code
 Setup:
     call    UART_Setup          ; Initialize UART
@@ -22,13 +21,7 @@ Clear_Loop:
     decfsz  WREG, F             ; Decrement counter, skip if zero
     bra     Clear_Loop
 
-    ; --- Step 1: Receive 16-byte packet from PC ---
     call    UART_Receive_Package
     
-    call    Mix_Key	; mix the key into the recieved data
 
-    ; --- Step 2: Process the buffer (optional encryption/decryption) ---
-    ; [Insert your algorithm here, operating on pkg_buffer]
-
-    ; --- Step 3: Send the 16-byte packet back to PC ---
     call    UART_Send_Package
