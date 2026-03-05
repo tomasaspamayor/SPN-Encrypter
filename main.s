@@ -2,7 +2,7 @@
 
 global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
-extrn	SBOX_Encrypt_Byte, Encrypt_Buffer
+extrn	SBOX_Encrypt_Byte, Encrypt_Buffer, SBOX_Decrypt_Byte, Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
 
 ; --- Reserve 16 bytes for the 128-bit packet ---
@@ -31,7 +31,7 @@ Clear_Loop:
 
     ; --- Step 2: Process the buffer (optional encryption/decryption) ---
     ; [Insert your algorithm here, operating on pkg_buffer]
-    call    Encrypt_Buffer
+    call    Decrypt_Buffer
 
     ; --- Step 3: Send the 16-byte packet back to PC ---
     call    UART_Send_Package
