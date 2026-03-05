@@ -20,6 +20,7 @@
       <itemPath>config.s</itemPath>
       <itemPath>main.s</itemPath>
       <itemPath>UART.s</itemPath>
+      <itemPath>key-mixing.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
