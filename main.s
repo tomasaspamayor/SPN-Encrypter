@@ -3,7 +3,7 @@
 global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	Key_Setup, Mix_Key
-extrn	Shift_Rows, Mix_All_Columns
+extrn	Run_P_Box, Mix_All_Columns, Shift_Rows
 
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -23,5 +23,6 @@ Clear_Loop:
 
     call    UART_Receive_Package
     
+    call    Shift_Rows
 
     call    UART_Send_Package
