@@ -99,76 +99,76 @@ Mix_Column:
     ; Note: (3*t1) is just (2*t1 ^ t1)
 
     ; Calculate 2*t0
-    movf    t0, W
+    movf    t0, W, A
     GF_X2
     movwf   res_byte        ; Start Result with (2*t0)
 
     ; Calculate 3*t1 and XOR
-    movf    t1, W
+    movf    t1, W, A
     GF_X2                   ; W = 2*t1
-    xorwf   t1, W           ; W = (2*t1) ^ t1 = 3*t1
-    xorwf   res_byte, F     ; res_byte ^= 3*t1
+    xorwf   t1, W, A           ; W = (2*t1) ^ t1 = 3*t1
+    xorwf   res_byte, F, A     ; res_byte ^= 3*t1
 
     ; XOR t2 and t3
-    movf    t2, W
-    xorwf   res_byte, F
-    movf    t3, W
-    xorwf   res_byte, F
+    movf    t2, W, A
+    xorwf   res_byte, F, A
+    movf    t3, W, A
+    xorwf   res_byte, F, A
 
     ; Save Result for Byte 0
     movff   res_byte, POSTINC1 ; Write to out_buffer
 
     ; Row 1 = t0 ^ (2*t1) ^ (3*t2) ^ t3
     
-    movf    t1, W
+    movf    t1, W, A
     GF_X2
     movwf   res_byte        ; Start with 2*t1
     
-    movf    t2, W
+    movf    t2, W, A
     GF_X2
-    xorwf   t2, W           ; W = 3*t2
-    xorwf   res_byte, F
+    xorwf   t2, W, A           ; W = 3*t2
+    xorwf   res_byte, F, A
     
-    movf    t0, W
-    xorwf   res_byte, F
-    movf    t3, W
-    xorwf   res_byte, F
+    movf    t0, W, A
+    xorwf   res_byte, F, A
+    movf    t3, W, A
+    xorwf   res_byte, F, A
     
     movff   res_byte, POSTINC1
 
     ; Row 2 = t0 ^ t1 ^ (2*t2) ^ (3*t3)
     
-    movf    t2, W
+    movf    t2, W, A
     GF_X2
     movwf   res_byte
     
-    movf    t3, W
+    movf    t3, W, A
     GF_X2
-    xorwf   t3, W
-    xorwf   res_byte, F
+    xorwf   t3, W, A
+    xorwf   res_byte, F, A
     
-    movf    t0, W
-    xorwf   res_byte, F
-    movf    t1, W
-    xorwf   res_byte, F
+    movf    t0, W, A
+    xorwf   res_byte, F, A
+    movf    t1, W, A
+    xorwf   res_byte, F, A
     
     movff   res_byte, POSTINC1
 
     ; Row 3 = (3*t0) ^ t1 ^ t2 ^ (2*t3)
     
-    movf    t3, W
+    movf    t3, W, A
     GF_X2
     movwf   res_byte
     
-    movf    t0, W
+    movf    t0, W, A
     GF_X2
-    xorwf   t0, W           ; W = 3*t0
-    xorwf   res_byte, F
+    xorwf   t0, W, A          ; W = 3*t0
+    xorwf   res_byte, F, A
     
-    movf    t1, W
-    xorwf   res_byte, F
-    movf    t2, W
-    xorwf   res_byte, F
+    movf    t1, W, A
+    xorwf   res_byte, F, A
+    movf    t2, W, A
+    xorwf   res_byte, F, A
     
     movff   res_byte, POSTINC1
     
