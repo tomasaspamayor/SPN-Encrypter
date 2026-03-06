@@ -14,7 +14,7 @@ no_reduce:
 
 psect	udata_acs   ; reserve data space in access ram
 count_h: ds 1
-count_1: ds 1
+count_l: ds 1
     
 temp_buffer: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
 res_byte: ds 1	; Temporary variable to hold results during MixColumns
