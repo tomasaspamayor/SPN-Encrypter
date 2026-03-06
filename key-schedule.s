@@ -2,19 +2,21 @@
 
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
-global  Key_Schedule, Test_Run_Expansion ; We need to make the key schedule function available to other modules
-extrn   SBOX_Encrypt_Byte, AL ; External S-Box and its AL register
+global  Key_Schedule, Test_Run_Expansion, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
+extrn   SBOX_Encrypt_Buffer ; External S-Box and its AL register
 
-psect    ks_data,class=DATA
-    count_reg: res 1
-    round_idx: res 1
-    Temp_0:    res 1
-    Temp_1:    res 1
-    Temp_2:    res 1
-    Temp_3:    res 1
+psect   udata
 
-    Key_Buffer: res 16    ; Original Master Key
-    Round_Keys: res 176   ; All 11 Round Keys (16 * 11)
+AL:      ds 1         ; Define AL as 1 byte in access bank
+count_reg:  ds 1
+round_idx:  ds 1
+Temp_0:     ds 1
+Temp_1:     ds 1
+Temp_2:     ds 1
+Temp_3:     ds 1
+
+Key_Buffer: ds 16     ; Original Master Key
+Round_Keys: ds 176    ; All 11 Round Keys (16 * 11)
 
 psect    ks_code,class=CODE
 Rcon_Table:
@@ -25,11 +27,11 @@ Key_Schedule:
     lfsr    0, Key_Buffer ; FSR0 points to start of master key
     lfsr    1, Round_Keys ; FSR1 points to start of round keys
     movlw   16 ; Number of bytes to copy
-    movwf   count_reg ; Store in counter variable
+    movwf   count_reg, A ; Store in counter variable
 
 Copy_Master:
     movff   POSTINC0, POSTINC1 ; Copy byte and increment both pointers
-    decfsz  count_reg, f ; Decrement counter, skip if zero
+    decfsz  count_reg, f, A ; Decrement counter, skip if zero
     bra     Copy_Master ; Loop until all 16 bytes are copied
 
     ; 2. Initialize Pointers for the Loop
@@ -38,7 +40,7 @@ Copy_Master:
     lfsr    0, Round_Keys       ; Point to Word 0
     lfsr    1, Round_Keys + 16  ; Point to Word 4 (Start of Round 1)
     
-    clrf    round_idx           ; round_idx = 0 (used for Rcon lookup)
+    clrf    round_idx, A           ; round_idx = 0 (used for Rcon lookup)
 
 Main_Expansion_Loop:
     ; --- STEP A: THE G-FUNCTION (Rot + Sub + Rcon) ---
@@ -58,81 +60,81 @@ Main_Expansion_Loop:
     ; --- STEP A.2: SubWord (Using your SBox_Encrypt_Byte) ---
     ; Process Temp_0
     movff   Temp_0, AL         ; Move Temp_0 to the S-Box input register
-    call    SBOX_Encrypt_Byte  ; Substituted value is now in AL
+    call    SBOX_Encrypt_Buffer  ; Substituted value is now in AL
     movff   AL, Temp_0         ; Store result back to Temp_0
     ; Process Temp_1
     movff   Temp_1, AL
-    call    SBOX_Encrypt_Byte
+    call    SBOX_Encrypt_Buffer
     movff   AL, Temp_1
     ; Process Temp_2
     movff   Temp_2, AL
-    call    SBOX_Encrypt_Byte
+    call    SBOX_Encrypt_Buffer
     movff   AL, Temp_2
     ; Process Temp_3
     movff   Temp_3, AL
-    call    SBOX_Encrypt_Byte
+    call    SBOX_Encrypt_Buffer
     movff   AL, Temp_3
 
     ; 3. Rcon: XOR first byte of Temp with Rcon_Table[round_idx]
-    movf    round_idx, w       ; Get round index for Rcon lookup
+    movf    round_idx, w, A       ; Get round index for Rcon lookup
     call    Get_Rcon           ; Helper to pull from Rcon_Table
-    xorwf   Temp_0, f          ; XOR with first byte of Temp
+    xorwf   Temp_0, f, A          ; XOR with first byte of Temp
 
     ; --- STEP B: GENERATE W[i] (First word of new key) ---
-    movf    POSTINC0, w        ; Get W[i-4] byte 0, increment FSR0
-    xorwf   Temp_0, w          
-    movwf   POSTINC1           ; Store to W[i] byte 0, increment FSR1
+    movf    POSTINC0, w, A        ; Get W[i-4] byte 0, increment FSR0
+    xorwf   Temp_0, w, A          
+    movwf   POSTINC1, A           ; Store to W[i] byte 0, increment FSR1
 
-    movf    POSTINC0, w        ; Get W[i-4] byte 1
-    xorwf   Temp_1, w          
-    movwf   POSTINC1           
+    movf    POSTINC0, w, A        ; Get W[i-4] byte 1
+    xorwf   Temp_1, w, A          
+    movwf   POSTINC1, A           
 
-    movf    POSTINC0, w        ; Get W[i-4] byte 2
-    xorwf   Temp_2, w          
-    movwf   POSTINC1           
+    movf    POSTINC0, w, A        ; Get W[i-4] byte 2
+    xorwf   Temp_2, w, A          
+    movwf   POSTINC1, A           
 
-    movf    POSTINC0, w        ; Get W[i-4] byte 3
-    xorwf   Temp_3, w          
-    movwf   POSTINC1
+    movf    POSTINC0, w, A        ; Get W[i-4] byte 3
+    xorwf   Temp_3, w, A          
+    movwf   POSTINC1, A
 
     ; --- STEP C: GENERATE W[i+1], W[i+2], W[i+3] ---
     ; This is the XOR chain: New Word = (4-words-ago) XOR (immediately-previous-word)
     movlw   12                 ; 3 words * 4 bytes
-    movwf   count_reg          ; We need to generate 3 more words (12 bytes)
+    movwf   count_reg, A          ; We need to generate 3 more words (12 bytes)
 
 XOR_Chain:
     ; W[i-4] is already at POSTINC0
     ; W[i-1] is the byte we JUST wrote to POSTINC1
     
     movlw   -1
-    movf    PLUSW1, w          ; Get W[i-1]
-    xorwf   POSTINC0, w        ; XOR with W[i-4], increment FSR0
-    movwf   POSTINC1           ; Store result to W[i], increment FSR1
+    movf    PLUSW1, w, A          ; Get W[i-1]
+    xorwf   POSTINC0, w, A        ; XOR with W[i-4], increment FSR0
+    movwf   POSTINC1, A           ; Store result to W[i], increment FSR1
     
-    decfsz  count_reg, f
+    decfsz  count_reg, f, A
     bra     XOR_Chain
 
     ; --- LOOP CONTROL ---
-    incf    round_idx, f       ; Move to next round
+    incf    round_idx, f, A       ; Move to next round
     movlw   10                 ; AES-128 uses 10 expansion rounds
-    cpfseq  round_idx          ; Have we finished round 10?
+    cpfseq  round_idx, A          ; Have we finished round 10?
     bra     Main_Expansion_Loop ; If not, loop back
     return                     ; If yes, we are done!
 
 ; --- SUBROUTINES ---
 
 Get_Rcon:
-    movlw   upper Rcon_Table
-    movwf   TBLPTRU
+    movlw   highword(Rcon_Table)
+    movwf   TBLPTRU, A
     movlw   high Rcon_Table
-    movwf   TBLPTRH
+    movwf   TBLPTRH, A
     movlw   low Rcon_Table
-    addwf   round_idx, w       
-    movwf   TBLPTRL
+    addwf   round_idx, w, A       
+    movwf   TBLPTRL, A
     movlw   0
-    addwfc  TBLPTRH, f         ; This is fine now because TBLPTRH was just reloaded
+    addwfc  TBLPTRH, f, A         ; This is fine now because TBLPTRH was just reloaded
     tblrd* ; Read Flash into TABLAT
-    movf    TABLAT, w   ; Move TABLAT into WREG    
+    movf    TABLAT, w, A   ; Move TABLAT into WREG    
     return
 
 Test_Run_Expansion:
@@ -141,7 +143,8 @@ Test_Run_Expansion:
     movlw   16                  ; 16 bytes for AES-128
     movwf   count_reg, A
 Clear_Key_Loop:
-    clrf    POSTINC0, A         ; Clear byte and move to next
+    movlw   0xFF
+    movwf   POSTINC0, A         ; Clear byte and move to next
     decfsz  count_reg, F, A
     bra     Clear_Key_Loop
 
