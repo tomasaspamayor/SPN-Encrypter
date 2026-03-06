@@ -4,7 +4,7 @@
 ; We will use the Rinjael S-Box, which is a well-known S-Box used in the AES encryption standard.
 ; There will be a symmetrical file to decrypt the message, which will use the inverse of the Rinjael S-Box.
 
-global  SBOX_Encrypt_Byte, Encrypt_Buffer, SBOX_Decrypt_Byte, Decrypt_Buffer
+global  SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn   pkg_buffer
 
 ; Define your custom registers in the variable section
@@ -201,7 +201,7 @@ SBOX_Encrypt_Byte:
 ; Output: pkg_buffer - 16 bytes of ciphertext (overwritten)
 ; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
 ;----------------------------------------------------------
-Encrypt_Buffer:
+SBOX_Encrypt_Buffer:
     ; Set up FSR1 to point to pkg_buffer
     movlw   LOW(pkg_buffer) ; Get low byte of buffer address
     movwf   FSR1L, A        ; Store in FSR1 low
@@ -212,7 +212,7 @@ Encrypt_Buffer:
     movlw   16
     movwf   COUNT, A
 
-Encrypt_Loop:
+SBOX_Encrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
     movwf   AL, A           ; Store in AL for encryption
@@ -226,7 +226,7 @@ Encrypt_Loop:
     
     ; Decrement counter and loop if not zero
     decfsz  COUNT, F, A
-    bra     Encrypt_Loop
+    bra     SBOX_Encrypt_Loop
     
     return
 
@@ -273,7 +273,7 @@ SBOX_Decrypt_Byte:
 ; Output: pkg_buffer - 16 bytes of plaintext (overwritten)
 ; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
 ;----------------------------------------------------------
-Decrypt_Buffer:
+SBOX_Decrypt_Buffer:
     ; Set up FSR1 to point to pkg_buffer
     movlw   LOW(pkg_buffer) ; Get low byte of buffer address
     movwf   FSR1L, A        ; Store in FSR1 low
@@ -284,7 +284,7 @@ Decrypt_Buffer:
     movlw   16
     movwf   COUNT, A
 
-Decrypt_Loop:
+SBOX_Decrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
     movwf   AL, A           ; Store in AL for decryption
@@ -298,6 +298,6 @@ Decrypt_Loop:
     
     ; Decrement counter and loop if not zero
     decfsz  COUNT, F, A
-    bra     Decrypt_Loop
+    bra     SBOX_Decrypt_Loop
     
     return
