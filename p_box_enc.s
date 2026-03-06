@@ -14,15 +14,21 @@ no_reduce:
 
 psect	udata_acs   ; reserve data space in access ram
 temp_buffer: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
+res_byte: ds 1	; Temporary variable to hold results during MixColumns
+col_count: ds 1	; Column counter for Mix_All_Columns
+copy_count: ds 1 ; Counter for copy-back loop
 t0: ds 1	; Temporary variable for MixColumns
 t1: ds 1
 t2: ds 1
 t3: ds 1
-res_byte: ds 1	; Temporary variable to hold results during MixColumns
-col_count: ds 1	; Column counter for Mix_All_Columns
-copy_count: ds 1 ; Counter for copy-back loop
+
 
 psect	uart_code, class=CODE
+    
+P_Box: 
+    call    Shift_Rows
+    
+    return 
 
 Shift_Rows:
     ; --- Row 0: No Shift ---
@@ -65,7 +71,7 @@ Copy_Back:
 
     return
 
-; --- Mix all 4 columns of the AES state in pkg_buffer ---
+; ---------------------------------------------------------------------------------------------------------------------
 Mix_All_Columns:
     lfsr    0, pkg_buffer       ; FSR0 = input (pkg_buffer)
     lfsr    1, temp_buffer      ; FSR1 = output (temp_buffer)
@@ -101,7 +107,7 @@ Mix_Column:
     ; Calculate 2*t0
     movf    t0, W, A
     GF_X2
-    movwf   res_byte        ; Start Result with (2*t0)
+    movwf   res_byte, A        ; Start Result with (2*t0)
 
     ; Calculate 3*t1 and XOR
     movf    t1, W, A
@@ -122,7 +128,7 @@ Mix_Column:
     
     movf    t1, W, A
     GF_X2
-    movwf   res_byte        ; Start with 2*t1
+    movwf   res_byte, A        ; Start with 2*t1
     
     movf    t2, W, A
     GF_X2
@@ -140,7 +146,7 @@ Mix_Column:
     
     movf    t2, W, A
     GF_X2
-    movwf   res_byte
+    movwf   res_byte, A
     
     movf    t3, W, A
     GF_X2
@@ -158,7 +164,7 @@ Mix_Column:
     
     movf    t3, W, A
     GF_X2
-    movwf   res_byte
+    movwf   res_byte, A
     
     movf    t0, W, A
     GF_X2
