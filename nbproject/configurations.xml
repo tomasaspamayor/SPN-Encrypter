@@ -26,6 +26,7 @@
   </logicalFolder>
   <sourceRootList>
     <Elem>.</Elem>
+    <Elem>../../../Documents</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>

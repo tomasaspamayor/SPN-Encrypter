@@ -13,6 +13,9 @@ no_reduce:
     endm
 
 psect	udata_acs   ; reserve data space in access ram
+count_h: ds 1
+count_1: ds 1
+    
 temp_buffer: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
 res_byte: ds 1	; Temporary variable to hold results during MixColumns
 col_count: ds 1	; Column counter for Mix_All_Columns
@@ -22,9 +25,26 @@ t1: ds 1
 t2: ds 1
 t3: ds 1
 
-
 psect	uart_code, class=CODE
-    
+
+delay_x4us:		    ; delay given in chunks of 4 microsecond in W
+	movwf	count_l, A	; now need to multiply by 16
+	swapf   count_l, F, A	; swap nibbles
+	movlw	0x0f	    
+	andwf	count_l, W, A ; move low nibble to W
+	movwf	count_h, A	; then to LCD_count_h
+	movlw	0xf0	    
+	andwf	count_l, F, A ; keep high nibble in LCD_count_l
+	call	delay
+	return
+
+delay:			; delay routine	4 instruction loop == 250ns	    
+	movlw 	0x00		; W=0
+lcdlp1:	decf 	count_l, F, A	; no carry when 0x00 -> 0xff
+	subwfb 	count_h, F, A	; no carry when 0x00 -> 0xff
+	bc 	lcdlp1		; carry, then loop again
+	return			; carry reset so return
+	
 Run_P_Box: 
         call    Shift_Rows
         call	Mix_All_Columns
@@ -37,7 +57,8 @@ Shift_Rows:
         movff   pkg_buffer+0x04,  temp_buffer+0x04
         movff   pkg_buffer+0x08,  temp_buffer+0x08
         movff   pkg_buffer+0x0C, temp_buffer+0x0C
-
+	
+	call	delay_x4us
         ; row 1, shift left 1
         ; [1, 5, 9, 13] -> [5, 9, 13, 1]
         movff   pkg_buffer+0x05,  temp_buffer+0x01   ; 5 moves to 1
