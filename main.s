@@ -17,7 +17,7 @@ Loop:
     lfsr    2, pkg_buffer       ; FSR2 points to start of buffer
     movlw   16                  ; Number of bytes to clear
 Clear_Loop:
-    movwf   POSTINC2            ; Write W=0 (clear) and increment pointer
+    clrf    POSTINC2            ; Write 0x00 to [FSR2] and increment pointer
     decfsz  WREG, F             ; Decrement counter, skip if zero
     bra     Clear_Loop
 
@@ -26,3 +26,4 @@ Clear_Loop:
     call    Shift_Rows
 
     call    UART_Send_Package
+    bra     Loop

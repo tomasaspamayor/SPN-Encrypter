@@ -65,7 +65,8 @@ Shift_Rows:
         movlw   16
         movwf   copy_count, A
     Copy_Back:
-        movff   POSTINC0, POSTINC1
+        movf    POSTINC0, W, A
+        movwf   POSTINC1, A
         decfsz  copy_count, F, A
         bra     Copy_Back
 
@@ -89,7 +90,8 @@ Mix_All_Columns:
         movlw   16
         movwf   copy_count, A
     Mix_Copy_Back:
-        movff   POSTINC0, POSTINC1
+        movf    POSTINC0, W, A
+        movwf   POSTINC1, A
         decfsz  copy_count, F, A
         bra     Mix_Copy_Back
         return
@@ -122,7 +124,7 @@ Mix_Column:
 
         ; Save
         movff   res_byte, POSTINC1 
-        
+
 
         ; Row 1 = t0 ^ (2*t1) ^ (3*t2) ^ t3
         
