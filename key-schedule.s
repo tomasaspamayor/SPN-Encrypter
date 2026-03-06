@@ -2,16 +2,19 @@
 
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
-global  Key_Schedule ; We need to make the key schedule function available to other modules
+global  Key_Schedule, Test_Run_Expansion ; We need to make the key schedule function available to other modules
 extrn   SBOX_Encrypt_Byte, AL ; External S-Box and its AL register
 
-psect    udata_acs
+psect    ks_data,class=DATA
     count_reg: res 1
     round_idx: res 1
     Temp_0:    res 1
     Temp_1:    res 1
     Temp_2:    res 1
     Temp_3:    res 1
+
+    Key_Buffer: res 16    ; Original Master Key
+    Round_Keys: res 176   ; All 11 Round Keys (16 * 11)
 
 psect    ks_code,class=CODE
 Rcon_Table:
@@ -109,6 +112,13 @@ XOR_Chain:
     decfsz  count_reg, f
     bra     XOR_Chain
 
+    ; --- LOOP CONTROL ---
+    incf    round_idx, f       ; Move to next round
+    movlw   10                 ; AES-128 uses 10 expansion rounds
+    cpfseq  round_idx          ; Have we finished round 10?
+    bra     Main_Expansion_Loop ; If not, loop back
+    return                     ; If yes, we are done!
+
 ; --- SUBROUTINES ---
 
 Get_Rcon:
@@ -123,4 +133,21 @@ Get_Rcon:
     addwfc  TBLPTRH, f         ; This is fine now because TBLPTRH was just reloaded
     tblrd* ; Read Flash into TABLAT
     movf    TABLAT, w   ; Move TABLAT into WREG    
+    return
+
+Test_Run_Expansion:
+    ; --- Step 1: Initialize Key_Buffer with All Zeros ---
+    lfsr    0, Key_Buffer       ; Point to your master key buffer
+    movlw   16                  ; 16 bytes for AES-128
+    movwf   count_reg, A
+Clear_Key_Loop:
+    clrf    POSTINC0, A         ; Clear byte and move to next
+    decfsz  count_reg, F, A
+    bra     Clear_Key_Loop
+
+    ; --- Step 2: Run the Schedule ---
+    call    Key_Schedule
+
+    ; --- Step 3: Stop Here ---
+    nop                         ; <--- SET BREAKPOINT HERE
     return
