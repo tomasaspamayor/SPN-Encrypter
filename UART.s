@@ -45,10 +45,10 @@ UART_Receive_Package:
 
 Wait_Byte:
     ; --- Error Checking ---
-    btfsc   RCSTA1, 1, A   ; OERR = bit 1 of RCSTA1
-    bra     Handle_Overrun
-    btfsc   RCSTA1, 2, A   ; FERR = bit 2 of RCSTA1
-    bra     Handle_Framing
+;    btfsc   RCSTA1, 1, A   ; OERR = bit 1 of RCSTA1
+;    bra     Handle_Overrun
+;    btfsc   RCSTA1, 2, A   ; FERR = bit 2 of RCSTA1
+;    bra     Handle_Framing
 
     ; --- Wait for Data ---
     btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
