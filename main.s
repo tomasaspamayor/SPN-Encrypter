@@ -24,11 +24,21 @@ Loop:
     movlw   0                   ; Load 0 into WREG for clearing
 Clear_Loop:
     movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
-    decfsz  WREG, F, A             ; Decrement counter, skip if zero
+    decfsz  CLEAR_CNT, F, A        ; Decrement counter, skip if zero
     bra     Clear_Loop
 
     ; --- Step 1: Receive 16-byte packet from PC ---
     call    UART_Receive_Package
+
+    lfsr    0, pkg_buffer       ; Source: received master key
+    lfsr    1, Key_Buffer       ; Destination: key schedule input
+    movlw   16
+    movwf   CLEAR_CNT, A
+
+    Copy_Key_Loop:
+        movff   POSTINC0, POSTINC1
+        decfsz  CLEAR_CNT, f, A
+        bra     Copy_Key_Loop
 
     ; --- Step 2: Process the buffer (optional encryption/decryption) ---
     ; [Insert your algorithm here, operating on pkg_buffer]

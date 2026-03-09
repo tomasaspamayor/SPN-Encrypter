@@ -60,7 +60,7 @@ Wait_Byte:
 
     decfsz  rx_counter, A   ; Decrement loop counter
     bra     Wait_Byte       ; Get next byte if not finished
-    
+
     return                  ; Buffer is now full (16 bytes received)
 
 Handle_Overrun:

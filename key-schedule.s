@@ -138,19 +138,28 @@ Get_Rcon:
     return
 
 Test_Run_Expansion:
-    ; --- Step 1: Initialize Key_Buffer with All Zeros ---
-    lfsr    0, Key_Buffer       ; Point to your master key buffer
-    movlw   16                  ; 16 bytes for AES-128
+    ; Copy pkg_buffer (received master key) to Key_Buffer
+    lfsr    0, pkg_buffer
+    lfsr    1, Key_Buffer
+    movlw   16
     movwf   count_reg, A
-Clear_Key_Loop:
-    movlw   0xFF
-    movwf   POSTINC0, A         ; Clear byte and move to next
-    decfsz  count_reg, F, A
-    bra     Clear_Key_Loop
-
-    ; --- Step 2: Run the Schedule ---
+Copy_Master_Key:
+    movff   POSTINC0, POSTINC1
+    decfsz  count_reg, f, A
+    bra     Copy_Master_Key
+    
+    ; Now run the schedule with correct master key
     call    Key_Schedule
-
-    ; --- Step 3: Stop Here ---
-    nop                         ; <--- SET BREAKPOINT HERE
+    
+    ; Copy Round_Keys[0:15] (first round key = master key) back to pkg_buffer
+    lfsr    0, Round_Keys
+    lfsr    1, pkg_buffer
+    movlw   16
+    movwf   count_reg, A
+Copy_Round_Key_Back:
+    movff   POSTINC0, POSTINC1
+    decfsz  count_reg, f, A
+    bra     Copy_Round_Key_Back
+    
+    nop  ; breakpoint here
     return

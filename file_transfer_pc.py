@@ -95,7 +95,6 @@ class FileTransfer():
                     packet_count += 1
                     print(f"Exchanged packet {packet_count}")
 
-                ser.write(b'\x04')
                 print(f"Exchange complete. {packet_count} packets processed.")
 
         except serial.SerialException as e:
