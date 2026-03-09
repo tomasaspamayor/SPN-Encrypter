@@ -17,24 +17,22 @@ Setup:
     call    UART_Setup          ; Initialize UART
     call    Key_Setup		; generate key
 Loop:
-    ; --- Step 0: Clear pkg_buffer to avoid leftover RAM content ---
-    lfsr    2, pkg_buffer       ; FSR2 points to start of buffer
-    movlw   16                  ; Number of bytes to clear
-    movwf   CLEAR_CNT, A        ; Store in counter variable
-    movlw   0                   ; Load 0 into WREG for clearing
+    ; --- Step 0: Clear pkg_buffer ---
+    lfsr    2, pkg_buffer
+    movlw   16
+    movwf   CLEAR_CNT, A
 Clear_Loop:
-    movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
-    decfsz  CLEAR_CNT, F, A        ; Decrement counter, skip if zero
+    clrf    POSTINC2, A         ; Explicitly clear
+    decfsz  CLEAR_CNT, F, A
     bra     Clear_Loop
 
-    ; --- Step 1: Receive 16-byte packet from PC ---
-    call    UART_Receive_Package
+    ; --- Step 1: Receive (TEMPORARILY COMMENT THIS OUT) ---
+    ; call    UART_Receive_Package 
 
-    ; --- Step 2: Process the buffer (optional encryption/decryption) ---
-    ; [Insert your algorithm here, operating on pkg_buffer]
+    ; --- Step 2: Process expansion with ZEROS ---
     call    Test_Run_Expansion
 
-    ; --- Step 3: Send the 16-byte packet back to PC ---
-    call    UART_Send_Package
+    ; --- Step 3: Send back to PC ---
+    call    UART_Send_Package ; This should now send 16 zeros (or the expansion of zeros)
 
     bra     Loop                ; Repeat indefinitely

@@ -74,7 +74,7 @@ Handle_Framing:
 
 UART_Send_Package:
     ; --- Step 1: Point FSR2 back to the start of the package ---
-    lfsr    2, Round_Keys+0x80        ; FSR2 = Base address of our 16-byte data
+    lfsr    2, Round_Keys        ; FSR2 = Base address of our 16-byte data
 
     ; --- Step 2: Set the length for the transmit routine ---
     movlw   16                  ; W = 16 (number of bytes to send)
