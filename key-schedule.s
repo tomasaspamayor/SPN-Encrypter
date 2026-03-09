@@ -3,7 +3,7 @@
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
 global  Key_Schedule, Test_Run_Expansion, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
-extrn   SBOX_Encrypt_Buffer ; External S-Box and its AL register
+extrn   SBOX_Encrypt_Buffer, pkg_buffer ; External S-Box and its AL register
 
 psect   udata
 

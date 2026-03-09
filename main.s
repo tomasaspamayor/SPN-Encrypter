@@ -3,7 +3,7 @@
 global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
-extrn	Key_Setup, Mix_Key
+extrn	Key_Setup, Mix_Key, Key_Buffer
 extrn	Test_Run_Expansion
 
 ; --- Reserve 16 bytes for the 128-bit packet ---
@@ -29,16 +29,6 @@ Clear_Loop:
 
     ; --- Step 1: Receive 16-byte packet from PC ---
     call    UART_Receive_Package
-
-    lfsr    0, pkg_buffer       ; Source: received master key
-    lfsr    1, Key_Buffer       ; Destination: key schedule input
-    movlw   16
-    movwf   CLEAR_CNT, A
-
-    Copy_Key_Loop:
-        movff   POSTINC0, POSTINC1
-        decfsz  CLEAR_CNT, f, A
-        bra     Copy_Key_Loop
 
     ; --- Step 2: Process the buffer (optional encryption/decryption) ---
     ; [Insert your algorithm here, operating on pkg_buffer]
