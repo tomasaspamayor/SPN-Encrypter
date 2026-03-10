@@ -3,7 +3,7 @@
 global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
-extrn	Key_Setup, Mix_Key, Key_Buffer
+extrn	Key_Setup, Mix_Key
 extrn	Test_Run_Expansion
 
 ; --- Reserve 16 bytes for the 128-bit packet ---
@@ -26,13 +26,13 @@ Clear_Loop:
     decfsz  CLEAR_CNT, F, A
     bra     Clear_Loop
 
-    ; --- Step 1: Receive (TEMPORARILY COMMENT THIS OUT) ---
-    ; call    UART_Receive_Package 
+    ; --- Step 1: Receive 16-byte key from PC ---
+    call    UART_Receive_Package 
 
-    ; --- Step 2: Process expansion with ZEROS ---
+    ; --- Step 2: Run key schedule expansion ---
     call    Test_Run_Expansion
 
-    ; --- Step 3: Send back to PC ---
-    call    UART_Send_Package ; This should now send 16 zeros (or the expansion of zeros)
+    ; --- Step 3: Send selected 16-byte round key back ---
+    call    UART_Send_Package
 
     bra     Loop                ; Repeat indefinitely

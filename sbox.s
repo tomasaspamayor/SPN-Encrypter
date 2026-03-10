@@ -9,9 +9,7 @@ extrn   pkg_buffer
 
 ; Define your custom registers in the variable section
 psect    udata_acs    ; Access bank uninitialized data
-AL:      ds 1         ; Define AL as 1 byte in access bank
 TEMP:    ds 1         ; Temporary storage
-RESULT:  ds 1         ; Result storage
 COUNT:   ds 1         ; Loop counter for 16 bytes
 
 psect	sbox_code,class=CODE
@@ -162,35 +160,29 @@ SBOX_INVERSE_DATA:
 ; S-Box Byte Encryption Function - FIXED VERSION
 ; Performs byte substitution using Rijndael S-Box
 ;
-; Input:  AL = byte to substitute
-; Output: AL = substituted value
+; Input:  WREG = byte to substitute
+; Output: WREG = substituted value
 ; Destroys: WREG, TBLPTR, TABLAT
 ;----------------------------------------------------------
 SBOX_Encrypt_Byte:
-    ; Get input byte from AL
-    movf    AL, W, A        ; Move AL to WREG
-    movwf   TEMP, A         ; Save in temporary register
-    
-    ; Load base address of S-Box into TBLPTR
-    movlw   LOW(SBOX_DATA)  ; Get low byte of address
-    movwf   TBLPTRL, A      ; Store in TBLPTR low
-    movlw   HIGH(SBOX_DATA) ; Get high byte of address
-    movwf   TBLPTRH, A      ; Store in TBLPTR high
-    movlw   (SBOX_DATA >> 16) & 0xFF ; Get upper byte of address
-    movwf   TBLPTRU, A      ; Store in TBLPTR upper
-    
-    ; Add offset (input byte) to base address
-    movf    TEMP, W, A      ; Get input byte
-    addwf   TBLPTRL, F, A   ; Add to low byte
-    movlw   0               ; Prepare carry
-    addwfc  TBLPTRH, F, A   ; Add carry to high byte
-    addwfc  TBLPTRU, F, A   ; Add carry to upper byte
-    
-    ; Read substituted value from program memory
-    tblrd*                  ; Read byte at TBLPTR into TABLAT
-    movf    TABLAT, W, A    ; Get the value
-    movwf   AL, A           ; Store result back in AL
-    
+    ; Input is in WREG
+    movwf   TEMP, A
+
+    movlw   LOW(SBOX_DATA)
+    movwf   TBLPTRL, A
+    movlw   HIGH(SBOX_DATA)
+    movwf   TBLPTRH, A
+    movlw   (SBOX_DATA >> 16) & 0xFF
+    movwf   TBLPTRU, A
+
+    movf    TEMP, W, A
+    addwf   TBLPTRL, F, A
+    movlw   0
+    addwfc  TBLPTRH, F, A
+    addwfc  TBLPTRU, F, A
+
+    tblrd*
+    movf    TABLAT, W, A     ; Return substituted byte in WREG
     return
     
 ;----------------------------------------------------------
@@ -199,7 +191,7 @@ SBOX_Encrypt_Byte:
 ;
 ; Input:  pkg_buffer (external) - 16 bytes of plaintext
 ; Output: pkg_buffer - 16 bytes of ciphertext (overwritten)
-; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
+; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, TEMP
 ;----------------------------------------------------------
 SBOX_Encrypt_Buffer:
     ; Set up FSR1 to point to pkg_buffer
@@ -215,13 +207,11 @@ SBOX_Encrypt_Buffer:
 SBOX_Encrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
-    movwf   AL, A           ; Store in AL for encryption
-    
+
     ; Encrypt the byte
     call    SBOX_Encrypt_Byte
     
     ; Write encrypted byte back to buffer
-    movf    AL, W, A        ; Get encrypted value
     movwf   POSTINC1, A     ; Store back and increment pointer
     
     ; Decrement counter and loop if not zero
@@ -234,13 +224,12 @@ SBOX_Encrypt_Loop:
 ; Inverse S-Box Byte Decryption Function
 ; Performs byte substitution using Inverse Rijndael S-Box
 ;
-; Input:  AL = byte to substitute (ciphertext)
-; Output: AL = substituted value (plaintext)
+; Input:  WREG = byte to substitute (ciphertext)
+; Output: WREG = substituted value (plaintext)
 ; Destroys: WREG, TBLPTR, TABLAT
 ;----------------------------------------------------------
 SBOX_Decrypt_Byte:
-    ; Get input byte from AL
-    movf    AL, W, A        ; Move AL to WREG
+    ; Input is in WREG
     movwf   TEMP, A         ; Save in temporary register
     
     ; Load base address of Inverse S-Box into TBLPTR
@@ -261,7 +250,6 @@ SBOX_Decrypt_Byte:
     ; Read substituted value from program memory
     tblrd*                  ; Read byte at TBLPTR into TABLAT
     movf    TABLAT, W, A    ; Get the value
-    movwf   AL, A           ; Store result back in AL
     
     return
 
@@ -271,7 +259,7 @@ SBOX_Decrypt_Byte:
 ;
 ; Input:  pkg_buffer (external) - 16 bytes of ciphertext
 ; Output: pkg_buffer - 16 bytes of plaintext (overwritten)
-; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, AL, TEMP
+; Destroys: WREG, TBLPTR, TABLAT, FSR1, COUNT, TEMP
 ;----------------------------------------------------------
 SBOX_Decrypt_Buffer:
     ; Set up FSR1 to point to pkg_buffer
@@ -287,13 +275,11 @@ SBOX_Decrypt_Buffer:
 SBOX_Decrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
-    movwf   AL, A           ; Store in AL for decryption
-    
+
     ; Decrypt the byte
     call    SBOX_Decrypt_Byte
     
     ; Write decrypted byte back to buffer
-    movf    AL, W, A        ; Get decrypted value
     movwf   POSTINC1, A     ; Store back and increment pointer
     
     ; Decrement counter and loop if not zero

@@ -3,21 +3,19 @@
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
 global  Key_Schedule, Test_Run_Expansion, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
-extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box and its AL register
+extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box byte routine (WREG in/out)
 
-psect   udata
-
-AL:      ds 1         ; Define AL as 1 byte in access bank
+psect   udata_acs
 count_reg:  ds 1
 round_idx:  ds 1
 Temp_0:     ds 1
 Temp_1:     ds 1
 Temp_2:     ds 1
 Temp_3:     ds 1
-xor_offset: ds 1
 
-Key_Buffer: ds 16     ; Original Master Key
-Round_Keys: ds 176    ; All 11 Round Keys (16 * 11)
+psect   udata
+Key_Buffer: ds 16
+Round_Keys: ds 176
 
 psect    ks_code,class=CODE
 Rcon_Table:
@@ -58,34 +56,28 @@ Main_Expansion_Loop:
     movlw   -4
     movff   PLUSW1, Temp_3
 
-; --- STEP A.2: SubWord (The AES Fix) ---
-    ; We must move the byte into the AL register that the S-Box uses.
-    
+; --- STEP A.2: SubWord (WREG in/out) ---
+
     movf    Temp_0, w, A
-    movwf   AL, A              ; Move Temp_0 to the S-Box's input
-    call    SBOX_Encrypt_Byte  ; Substitutes AL
-    movff   AL, Temp_0         ; Store result (should be 0x63) back
+    call    SBOX_Encrypt_Byte
+    movwf   Temp_0, A
 
     movf    Temp_1, w, A
-    movwf   AL, A
     call    SBOX_Encrypt_Byte
-    movff   AL, Temp_1
+    movwf   Temp_1, A
 
     movf    Temp_2, w, A
-    movwf   AL, A
     call    SBOX_Encrypt_Byte
-    movff   AL, Temp_2
+    movwf   Temp_2, A
 
     movf    Temp_3, w, A
-    movwf   AL, A
     call    SBOX_Encrypt_Byte
-    movff   AL, Temp_3
+    movwf   Temp_3, A
     
 ; --- STEP A.3: Rcon XOR  ---
-    movf    round_idx, w, A     ; Load current round index (0-9)
-    call    Get_Rcon            ; Fetch Rcon[round_idx] into AL
-    movf    AL, w, A            ; Move Rcon value to W
-    xorwf   Temp_0, f, A        ; XOR Rcon ONLY with the first byte (Temp_0)
+    movf    round_idx, w, A
+    call    Get_Rcon
+    xorwf   Temp_0, f, A
 
     ; --- STEP B: GENERATE W[i] (First word of new key) ---
     movf    POSTINC0, w, A        ; Get W[i-4] byte 0, increment FSR0
@@ -126,8 +118,7 @@ XOR_Chain:
 ; --- SUBROUTINES ---
 
 Get_Rcon:
-    ; Input: WREG = index into Rcon_Table
-    ; Load base address of Rcon_Table into TBLPTR
+    ; Input: WREG = round_idx
     movlw   LOW(Rcon_Table)
     movwf   TBLPTRL, A
     movlw   HIGH(Rcon_Table)
@@ -135,16 +126,14 @@ Get_Rcon:
     movlw   (Rcon_Table >> 16) & 0xFF
     movwf   TBLPTRU, A
 
-    ; Add index (in WREG) to TBLPTR, handle carry across bytes
     addwf   TBLPTRL, F, A
+    movlw   0
     addwfc  TBLPTRH, F, A
     addwfc  TBLPTRU, F, A
-    
-    ; Read the byte from program memory into TABLAT
+
     tblrd*
     movf    TABLAT, W, A
-    movwf   AL, A
-    return 
+    return
 
 Test_Run_Expansion:
     ; Copy pkg_buffer (received master key) to Key_Buffer
