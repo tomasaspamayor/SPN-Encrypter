@@ -66,7 +66,7 @@ class FileTransfer():
 
         ser = None
         try:
-            ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
+            ser = serial.Serial(self.serial_port, self.baud_rate, timeout=20)
 
             # --- 2. WRITE: Open the output file in TEXT mode to save hex strings ---
             with open(self.receive_path, 'w', encoding="utf-8") as f_recv:

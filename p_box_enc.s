@@ -45,7 +45,6 @@ Shift_Rows:
         bra     Clear_Temp_Buffer
 
 	
-	call	delay_ms
         ; --- Row 0: No Shift ---
         ; [0, 4, 8, 12] -> [0, 4, 8, 12]
         movff   pkg_buffer+0x00,  temp_buffer+0x00
@@ -53,7 +52,6 @@ Shift_Rows:
         movff   pkg_buffer+0x08,  temp_buffer+0x08
         movff   pkg_buffer+0x0C, temp_buffer+0x0C
 	
-	call	delay_ms
         ; row 1, shift left 1
         ; [1, 5, 9, 13] -> [5, 9, 13, 1]
         movff   pkg_buffer+0x05,  temp_buffer+0x01   ; 5 moves to 1
@@ -61,7 +59,6 @@ Shift_Rows:
         movff   pkg_buffer+0x0D, temp_buffer+0x09   ; 13 moves to 9
         movff   pkg_buffer+0x01,  temp_buffer+0x0D  ; 1 (wrapped) moves to 13
 	
-	call	delay_ms
         ; row 2, shift left 2
         ; [2, 6, 10, 14] -> [10, 14, 2, 6]
         movff   pkg_buffer+0x0A, temp_buffer+0x02   ; 10 moves to 2
@@ -69,7 +66,6 @@ Shift_Rows:
         movff   pkg_buffer+0x02,  temp_buffer+0x0A  ; 2 (wrapped) moves to 10
         movff   pkg_buffer+0x06,  temp_buffer+0x0E  ; 6 (wrapped) moves to 14
 	
-	call	delay_ms
         ; row 3, shift left 3
         ; [3, 7, 11, 15] -> [15, 3, 7, 11]
         movff   pkg_buffer+0x0F, temp_buffer+0x03   ; 15 moves to 3
@@ -77,14 +73,12 @@ Shift_Rows:
         movff   pkg_buffer+0x07,  temp_buffer+0x0B  ; 7 (wrapped) moves to 11
         movff   pkg_buffer+0x0B, temp_buffer+0x0F  ; 11 (wrapped) moves to 15
 	
-	call	delay_ms
         ; Copy temp_buffer back to pkg_buffer
         lfsr    0, temp_buffer
         lfsr    1, pkg_buffer
         movlw   16
         movwf   copy_count, A
-    Copy_Back:
-	call	delay_ms
+    Copy_Back:	
         movf    POSTINC0, W, A
         movwf   POSTINC1, A
         decfsz  copy_count, F, A
