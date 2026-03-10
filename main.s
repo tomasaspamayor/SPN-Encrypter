@@ -34,5 +34,5 @@ Clear_Loop:
 
     ; --- Step 3: Send selected 16-byte round key back ---
     call    UART_Send_Package
-
+    movlw   0x04
     bra     Loop                ; Repeat indefinitely

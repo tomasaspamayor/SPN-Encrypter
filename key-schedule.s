@@ -45,16 +45,17 @@ Main_Expansion_Loop:
     ; --- STEP A: THE G-FUNCTION (Rot + Sub + Rcon) ---
     ; We need W[i-1]. Since FSR1 points to W[i], W[i-1] is at FSR1-4.
 
-    ; --- STEP A.1: RotWord (Dynamic Version) ---
-    ; Byte 0 (Temp) = [FSR1-3], Byte 1 = [FSR1-2], Byte 2 = [FSR1-1], Byte 3 = [FSR1-4]
-    movlw   -3
-    movff   PLUSW1, Temp_0
-    movlw   -2
-    movff   PLUSW1, Temp_1
-    movlw   -1
-    movff   PLUSW1, Temp_2
-    movlw   -4
-    movff   PLUSW1, Temp_3
+    movlw 253
+    movff PLUSW1, Temp_0
+
+    movlw 254
+    movff PLUSW1, Temp_1
+
+    movlw 255
+    movff PLUSW1, Temp_2
+
+    movlw 252
+    movff PLUSW1, Temp_3
 
 ; --- STEP A.2: SubWord (WREG in/out) ---
 
@@ -74,9 +75,11 @@ Main_Expansion_Loop:
     call    SBOX_Encrypt_Byte
     movwf   Temp_3, A
     
-; --- STEP A.3: Rcon XOR  ---
+    ; --- STEP A.3: Rcon XOR  ---
     movf    round_idx, w, A
     call    Get_Rcon
+    movwf   Temp_3, A        ; store Rcon safely
+    movf    Temp_3, w, A
     xorwf   Temp_0, f, A
 
     ; --- STEP B: GENERATE W[i] (First word of new key) ---
@@ -119,17 +122,18 @@ XOR_Chain:
 
 Get_Rcon:
     ; Input: WREG = round_idx
+
+    movwf   Temp_2, A
+
     movlw   LOW(Rcon_Table)
+    addwf   Temp_2, W, A
     movwf   TBLPTRL, A
+
     movlw   HIGH(Rcon_Table)
     movwf   TBLPTRH, A
+
     movlw   (Rcon_Table >> 16) & 0xFF
     movwf   TBLPTRU, A
-
-    addwf   TBLPTRL, F, A
-    movlw   0
-    addwfc  TBLPTRH, F, A
-    addwfc  TBLPTRU, F, A
 
     tblrd*
     movf    TABLAT, W, A

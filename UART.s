@@ -73,7 +73,7 @@ Handle_Framing:
     bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
 
 UART_Send_Package:
-    lfsr    2, Round_Keys+0x10   ; second 16-byte block (round key 1)
+    lfsr    2, Round_Keys+0x20   ; second 16-byte block (round key 1)
     movlw   16
     call    UART_Transmit_Message
     return
