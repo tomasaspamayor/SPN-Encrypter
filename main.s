@@ -23,7 +23,7 @@ Clear_Loop:
 
     call    UART_Receive_Package
     
-    call    Shift_Rows
+    call    Mix_All_Columns
 
     call    UART_Send_Package
     bra     Loop
