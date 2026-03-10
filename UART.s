@@ -53,7 +53,6 @@ Wait_Byte:
 
     ; --- Wait for Data ---
     btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
-    btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
     bra     Wait_Byte       ; Keep polling until a byte is received
 
     ; --- Store Data ---

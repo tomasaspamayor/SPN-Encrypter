@@ -22,6 +22,8 @@
       <itemPath>UART.s</itemPath>
       <itemPath>key-mixing.s</itemPath>
       <itemPath>p_box_enc.s</itemPath>
+      <itemPath>sbox.s</itemPath>
+      <itemPath>p_box_dec.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
