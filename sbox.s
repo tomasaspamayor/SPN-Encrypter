@@ -212,7 +212,7 @@ SBOX_Encrypt_Buffer:
     movlw   16
     movwf   COUNT, A
 
-Encrypt_Loop:
+S_Encrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
     movwf   AL, A           ; Store in AL for encryption
@@ -226,7 +226,7 @@ Encrypt_Loop:
     
     ; Decrement counter and loop if not zero
     decfsz  COUNT, F, A
-    bra     Encrypt_Loop
+    bra     S_Encrypt_Loop
     
     return
 
@@ -284,7 +284,7 @@ SBOX_Decrypt_Buffer:
     movlw   16
     movwf   COUNT, A
 
-Decrypt_Loop:
+S_Decrypt_Loop:
     ; Read byte from buffer
     movf    INDF1, W, A     ; Get current byte from pkg_buffer
     movwf   AL, A           ; Store in AL for decryption
@@ -298,6 +298,6 @@ Decrypt_Loop:
     
     ; Decrement counter and loop if not zero
     decfsz  COUNT, F, A
-    bra     Decrypt_Loop
+    bra     S_Decrypt_Loop
     
     return
