@@ -1,6 +1,6 @@
 #include <xc.inc>
 
-global  Unshift_Rows, Unmix_All_Columns
+global  Unshift_Rows, Unmix_All_Columns, P_Box_Dec
 extrn   pkg_buffer
 
 psect	udata_acs
@@ -315,4 +315,3 @@ Unmix_Column:
 
         return
 
-        

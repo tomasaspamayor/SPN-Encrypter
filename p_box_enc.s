@@ -1,6 +1,6 @@
 #include <xc.inc>
 
-global  P_Box_Enc
+global  P_Box_Enc, Shift_Rows, Mix_All_Columns
 extrn   pkg_buffer
 
 ; GF(2^8) macro: multiply W by 2 in GF(2^8) with AES polynomial

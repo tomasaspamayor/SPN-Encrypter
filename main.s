@@ -4,7 +4,7 @@ global  pkg_buffer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	SBOX_Encrypt_Byte, Encrypt_Buffer, SBOX_Decrypt_Byte, Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
-extrn	Run_P_Box, Mix_All_Columns, Shift_Rows
+extrn	P_Box_Enc, P_Box_Dec
 
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -27,7 +27,8 @@ Clear_Loop:
 
     call    UART_Receive_Package
     
-    call    Mix_All_Columns
+    call    P_Box_Enc
+    call    P_Box_Dec
 
     call    UART_Send_Package
 
