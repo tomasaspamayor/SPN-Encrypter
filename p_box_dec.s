@@ -13,7 +13,7 @@ t1_d: ds 1
 t2_d: ds 1
 t3_d: ds 1
 
-psect const_data, class=CONST, space=0, align=256
+psect const_data, class=CONST, space=0, reloc=256
 Mult9_Table: db 0x00,0x09,0x12,0x1b,0x24,0x2d,0x36,0x3f,0x48,0x41,0x5a,0x53,0x6c,0x65,0x7e,0x77,
 0x90,0x99,0x82,0x8b,0xb4,0xbd,0xa6,0xaf,0xd8,0xd1,0xca,0xc3,0xfc,0xf5,0xee,0xe7,
 0x3b,0x32,0x29,0x20,0x1f,0x16,0x0d,0x04,0x73,0x7a,0x61,0x68,0x57,0x5e,0x45,0x4c,
@@ -95,9 +95,9 @@ Multiply_By_9: ; w holds the byte to be multiplied by 9
 
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
-        movlw   UPPER(Mult9_Table)
+        movlw   low(highword(Mult9_Table))
         movwf   TBLPTRU, A
-        movlw   HIGH(Mult9_Table)
+        movlw   high(Mult9_Table)
         movwf   TBLPTRH, A
 
         tblrd* ; Reads the byte at TBLPTR into TABLAT
@@ -110,9 +110,9 @@ Multiply_By_11: ; w holds the byte to be multiplied by 11
 
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
-        movlw   UPPER(Mult11_Table)
+        movlw   low(highword(Mult11_Table))
         movwf   TBLPTRU, A
-        movlw   HIGH(Mult11_Table)
+        movlw   high(Mult11_Table)
         movwf   TBLPTRH, A
 
         tblrd* ; Reads the byte at TBLPTR into TABLAT
@@ -125,9 +125,9 @@ Multiply_By_13: ; w holds the byte to be multiplied by 13
 
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
-        movlw   UPPER(Mult13_Table)
+        movlw   low(highword(Mult13_Table))
         movwf   TBLPTRU, A
-        movlw   HIGH(Mult13_Table)
+        movlw   high(Mult13_Table)
         movwf   TBLPTRH, A
 
         tblrd* ; Reads the byte at TBLPTR into TABLAT
@@ -140,9 +140,9 @@ Multiply_By_14: ; w holds the byte to be multiplied by 14
 
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
-        movlw   UPPER(Mult14_Table)
+        movlw   low(highword(Mult14_Table))
         movwf   TBLPTRU, A
-        movlw   HIGH(Mult14_Table)
+        movlw   high(Mult14_Table)
         movwf   TBLPTRH, A
 
         tblrd* ; Reads the byte at TBLPTR into TABLAT
