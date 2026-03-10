@@ -78,6 +78,7 @@ class FileTransfer():
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
+                    print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
                     ser.write(send_packet)
 
                     # Read raw bytes from hardware
@@ -88,6 +89,7 @@ class FileTransfer():
                         break
 
                     # --- 3. CONVERT: Turn binary response back into hex text ---
+                    print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
                     f_recv.write(recv_packet.hex() + "\n")
 
                     packet_count += 1

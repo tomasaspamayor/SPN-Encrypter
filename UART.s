@@ -42,6 +42,7 @@ UART_Receive_Package:
     movlw   16              ; We expect exactly 16 bytes (128 bits)
     movwf   rx_counter, A
     bsf RCSTA1, 4, A   ; Enable Continuous Receive
+    bsf RCSTA1, 4, A   ; Enable Continuous Receive
 
 Wait_Byte:
     ; --- Error Checking ---
@@ -51,6 +52,7 @@ Wait_Byte:
 ;    bra     Handle_Framing
 
     ; --- Wait for Data ---
+    btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
     btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
     bra     Wait_Byte       ; Keep polling until a byte is received
 
@@ -64,6 +66,8 @@ Wait_Byte:
     return                  ; Buffer is now full (16 bytes received)
 
 Handle_Overrun:
+    bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
+    bsf     RCSTA1, 4, A
     bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
     bsf     RCSTA1, 4, A
     bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
