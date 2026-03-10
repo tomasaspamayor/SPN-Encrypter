@@ -1,6 +1,6 @@
 #include <xc.inc>
 
-global  Run_P_Box, Mix_All_Columns, Shift_Rows 
+global  P_Box_Enc
 extrn   pkg_buffer
 
 ; GF(2^8) macro: multiply W by 2 in GF(2^8) with AES polynomial
@@ -18,18 +18,17 @@ count_l: ds 1
 cnt_ms: ds 1
     
 temp_buffer_enc: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
-res_byte: ds 1	; Temporary variable to hold results during MixColumns
-col_count: ds 1	; Column counter for Mix_All_Columns
-copy_count: ds 1 ; Counter for copy-back loop
-t0: ds 1	; Temporary variable for MixColumns
-t1: ds 1
-t2: ds 1
-t3: ds 1
+res_byte_enc: ds 1	; Temporary variable to hold results during MixColumns
+col_count_enc: ds 1	; Column counter for Mix_All_Columns
+copy_count_enc: ds 1 ; Counter for copy-back loop
+t0_e: ds 1	; Temporary variable for MixColumns
+t1_e: ds 1
+t2_e: ds 1
+t3_e: ds 1
 
 psect	uart_code, class=CODE
 
-
-Run_P_Box: 
+P_Box_Enc: 
         call    Shift_Rows
         call	Mix_All_Columns
         return 
@@ -38,10 +37,10 @@ Shift_Rows:
     ; first, clear the temporary buffer
 	lfsr    0, temp_buffer_enc
         movlw   16
-        movwf   copy_count, A
+        movwf   copy_count_enc, A
     Clear_temp_buffer_enc:
         clrf    POSTINC0, A
-        decfsz  copy_count, F, A
+        decfsz  copy_count_enc, F, A
         bra     Clear_temp_buffer_enc
 
 	
@@ -77,11 +76,11 @@ Shift_Rows:
         lfsr    0, temp_buffer_enc
         lfsr    1, pkg_buffer
         movlw   16
-        movwf   copy_count, A
+        movwf   copy_count_enc, A
     Copy_Back_enc:	
         movf    POSTINC0, W, A
         movwf   POSTINC1, A
-        decfsz  copy_count, F, A
+        decfsz  copy_count_enc, F, A
         bra     Copy_Back_enc
 
         return
@@ -91,121 +90,122 @@ Mix_All_Columns:
         lfsr    0, pkg_buffer       ; FSR0 = input (pkg_buffer)
         lfsr    1, temp_buffer_enc      ; FSR1 = output (temp_buffer_enc)
         movlw   4
-        movwf   col_count, A
+        movwf   col_count_enc, A
 
     Mix_Col_Loop:   ; iteratively mix each column
         call    Mix_Column
-        decfsz  col_count, F, A
+        decfsz  col_count_enc, F, A
         bra     Mix_Col_Loop
 
         ; Move temp_buffer_enc back to pkg_buffer
         lfsr    0, temp_buffer_enc
         lfsr    1, pkg_buffer
         movlw   16
-        movwf   copy_count, A
+        movwf   copy_count_enc, A
 
     Mix_Copy_Back:
         movf    POSTINC0, W, A
         movwf   POSTINC1, A
-        decfsz  copy_count, F, A
+        decfsz  copy_count_enc, F, A
         bra     Mix_Copy_Back
         return
 
 ; reads 4 bytes from FSR0, writes output 4 bytes to FSR1
 Mix_Column:
         ; read in first column
-        movff   POSTINC0, t0    ; t0 = byte 0
-        movff   POSTINC0, t1    ; t1 = byte 1
-        movff   POSTINC0, t2    ; t2 = byte 2
-        movff   POSTINC0, t3    ; t3 = byte 3
+        movff   POSTINC0, t0_e    ; t0_e = byte 0
+        movff   POSTINC0, t1_e    ; t1_e = byte 1
+        movff   POSTINC0, t2_e    ; t2_e = byte 2
+        movff   POSTINC0, t3_e    ; t3_e = byte 3
 
-        ; Row 0 = (2*t0) ^ (3*t1) ^ t2 ^ t3
-
-        ; 2*t0
-        movf    t0, W, A
+        ; --------------------------------------------------------------------------------
+        ; Row 0 = (2*t0_e) ^ (3*t1_e) ^ t2_e ^ t3_e
+        ; 2*t0_e
+        movf    t0_e, W, A
         GF_X2
-        movwf   res_byte, A        
+        movwf   res_byte_enc, A        
 
-        ; ^ 3*t1 
-        movf    t1, W, A
+        ; ^ 3*t1_e 
+        movf    t1_e, W, A
         GF_X2
-        xorwf   t1, W, A           
-        xorwf   res_byte, F, A     
+        xorwf   t1_e, W, A           
+        xorwf   res_byte_enc, F, A     
 
-        ; t2 ^ t3
-        movf    t2, W, A
-        xorwf   res_byte, F, A
-        movf    t3, W, A
-        xorwf   res_byte, F, A
+        ; t2_e ^ t3_e
+        movf    t2_e, W, A
+        xorwf   res_byte_enc, F, A
+        movf    t3_e, W, A
+        xorwf   res_byte_enc, F, A
 
         ; Save
-        movff   res_byte, POSTINC1 
+        movff   res_byte_enc, POSTINC1 
 
-
-        ; Row 1 = t0 ^ (2*t1) ^ (3*t2) ^ t3
-        
-        ; 2*t1
-        movf    t1, W, A
+        ; --------------------------------------------------------------------------------
+        ; Row 1 = t0_e ^ (2*t1_e) ^ (3*t2_e) ^ t3_e
+        ; 2*t1_e
+        movf    t1_e, W, A
         GF_X2
-        movwf   res_byte, A        
+        movwf   res_byte_enc, A        
         
-        ; ^ 3*t2
-        movf    t2, W, A
+        ; ^ 3*t2_e
+        movf    t2_e, W, A
         GF_X2
-        xorwf   t2, W, A         
-        xorwf   res_byte, F, A
+        xorwf   t2_e, W, A         
+        xorwf   res_byte_enc, F, A
         
-        ; ^ t0 ^ t3
-        movf    t0, W, A
-        xorwf   res_byte, F, A
-        movf    t3, W, A
-        xorwf   res_byte, F, A
+        ; ^ t0_e ^ t3_e
+        movf    t0_e, W, A
+        xorwf   res_byte_enc, F, A
+        movf    t3_e, W, A
+        xorwf   res_byte_enc, F, A
         
-        movff   res_byte, POSTINC1
-
-        ; Row 2 = t0 ^ t1 ^ (2*t2) ^ (3*t3)
+        movff   res_byte_enc, POSTINC1
         
-        ;   2*t2
-        movf    t2, W, A
+        ; --------------------------------------------------------------------------------
+        ; Row 2 = t0_e ^ t1_e ^ (2*t2_e) ^ (3*t3_e)
+        
+        ;   2*t2_e
+        movf    t2_e, W, A
         GF_X2
-        movwf   res_byte, A
+        movwf   res_byte_enc, A
         
-        ; ^ 3*t3
-        movf    t3, W, A
+        ; ^ 3*t3_e
+        movf    t3_e, W, A
         GF_X2
-        xorwf   t3, W, A
-        xorwf   res_byte, F, A
+        xorwf   t3_e, W, A
+        xorwf   res_byte_enc, F, A
         
-        ; ^ t0 ^ t1
-        movf    t0, W, A
-        xorwf   res_byte, F, A
-        movf    t1, W, A
-        xorwf   res_byte, F, A
+        ; ^ t0_e ^ t1_e
+        movf    t0_e, W, A
+        xorwf   res_byte_enc, F, A
+        movf    t1_e, W, A
+        xorwf   res_byte_enc, F, A
         
         ; save
-        movff   res_byte, POSTINC1
+        movff   res_byte_enc, POSTINC1
 
-        ; Row 3 = (3*t0) ^ t1 ^ t2 ^ (2*t3)
+        ; --------------------------------------------------------------------------------
+        ; Row 3 = (3*t0_e) ^ t1_e ^ t2_e ^ (2*t3_e)
         
-        ; 2*t3
-        movf    t3, W, A
+        ; 2*t3_e
+        movf    t3_e, W, A
         GF_X2
-        movwf   res_byte, A
+        movwf   res_byte_enc, A
         
-        ; ^ 3*t0
-        movf    t0, W, A
+        ; ^ 3*t0_e
+        movf    t0_e, W, A
         GF_X2
-        xorwf   t0, W, A          ; W = 3*t0
-        xorwf   res_byte, F, A
+        xorwf   t0_e, W, A          ; W = 3*t0_e
+        xorwf   res_byte_enc, F, A
         
-        ; ^ t1 ^ t2
-        movf    t1, W, A
-        xorwf   res_byte, F, A
-        movf    t2, W, A
-        xorwf   res_byte, F, A
+        ; ^ t1_e ^ t2_e
+        movf    t1_e, W, A
+        xorwf   res_byte_enc, F, A
+        movf    t2_e, W, A
+        xorwf   res_byte_enc, F, A
         
         ; save 4th byte
-        movff   res_byte, POSTINC1
+        movff   res_byte_enc, POSTINC1
 
         
         return
