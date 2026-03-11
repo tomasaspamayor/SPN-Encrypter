@@ -5,13 +5,13 @@
 global  Key_Schedule, Test_Run_Expansion, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
 extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box byte routine (WREG in/out)
 
-psect   udata_acs
-count_reg:  ds 1
-round_idx:  ds 1
-Temp_0:     ds 1
-Temp_1:     ds 1
-Temp_2:     ds 1
-Temp_3:     ds 1
+psect   udata_acs_ks, class=COMRAM ; Use a unique name for this psect
+KS_count_reg: ds 1   ; Renamed to avoid S-Box 'COUNT' conflict
+KS_round_idx: ds 1
+KS_Temp_0:    ds 1   ; Renamed to avoid S-Box 'TEMP' conflict
+KS_Temp_1:    ds 1
+KS_Temp_2:    ds 1
+KS_Temp_3:    ds 1
 
 psect   udata
 Key_Buffer: ds 16
@@ -26,11 +26,11 @@ Key_Schedule:
     lfsr    0, Key_Buffer ; FSR0 points to start of master key
     lfsr    1, Round_Keys ; FSR1 points to start of round keys
     movlw   16 ; Number of bytes to copy
-    movwf   count_reg, A ; Store in counter variable
+    movwf   KS_count_reg, A ; Store in counter variable
 
 Copy_Master:
     movff   POSTINC0, POSTINC1 ; Copy byte and increment both pointers
-    decfsz  count_reg, f, A ; Decrement counter, skip if zero
+    decfsz  KS_count_reg, f, A ; Decrement counter, skip if zero
     bra     Copy_Master ; Loop until all 16 bytes are copied
 
     ; 2. Initialize Pointers for the Loop
@@ -39,82 +39,88 @@ Copy_Master:
     lfsr    0, Round_Keys       ; Point to Word 0
     lfsr    1, Round_Keys + 16  ; Point to Word 4 (Start of Round 1)
     
-    clrf    round_idx, A           ; round_idx = 0 (used for Rcon lookup)
+    clrf    KS_round_idx, A           ; round_idx = 0 (used for Rcon lookup)
 
 Main_Expansion_Loop:
-    ; --- STEP A: THE G-FUNCTION (Rot + Sub + Rcon) ---
-    ; We need W[i-1]. Since FSR1 points to W[i], W[i-1] is at FSR1-4.
-
-    movlw 253
-    movff PLUSW1, Temp_0
-
-    movlw 254
-    movff PLUSW1, Temp_1
-
-    movlw 255
-    movff PLUSW1, Temp_2
-
-    movlw 252
-    movff PLUSW1, Temp_3
-
-; --- STEP A.2: SubWord (WREG in/out) ---
-
-    movf    Temp_0, w, A
-    call    SBOX_Encrypt_Byte
-    movwf   Temp_0, A
-
-    movf    Temp_1, w, A
-    call    SBOX_Encrypt_Byte
-    movwf   Temp_1, A
-
-    movf    Temp_2, w, A
-    call    SBOX_Encrypt_Byte
-    movwf   Temp_2, A
-
-    movf    Temp_3, w, A
-    call    SBOX_Encrypt_Byte
-    movwf   Temp_3, A
+    ; --- STEP A: THE G-FUNCTION (RotWord) ---
+    ; Using unique KS_Temp names to prevent S-Box memory collisions
     
-    ; --- STEP A.3: Rcon XOR  ---
-    movf    round_idx, w, A
-    call    Get_Rcon
-    movwf   Temp_3, A        ; store Rcon safely
-    movf    Temp_3, w, A
-    xorwf   Temp_0, f, A
+    movlw   253             ; Byte 1 -> Becomes first byte
+    movff   PLUSW1, KS_Temp_0
+    movlw   254             ; Byte 2 -> Becomes second byte
+    movff   PLUSW1, KS_Temp_1
+    movlw   255             ; Byte 3 -> Becomes third byte
+    movff   PLUSW1, KS_Temp_2
+    movlw   252             ; Byte 0 -> Becomes fourth byte
+    movff   PLUSW1, KS_Temp_3
 
-    ; --- STEP B: GENERATE W[i] (First word of new key) ---
-    movf    POSTINC0, w, A        ; Get W[i-4] byte 0, increment FSR0
-    xorwf   Temp_0, w, A          
-    movwf   POSTINC1, A           ; Store to W[i] byte 0, increment FSR1
+    ; --- STEP A.2: SubWord (WREG in/out) ---
+    ; WREG is used for transfer; KS_Temp variables hold the state
+    
+    movf    KS_Temp_0, w, A
+    call    SBOX_Encrypt_Byte
+    movwf   KS_Temp_0, A
 
-    movf    POSTINC0, w, A        ; Get W[i-4] byte 1
-    xorwf   Temp_1, w, A          
-    movwf   POSTINC1, A           
+    movf    KS_Temp_1, w, A
+    call    SBOX_Encrypt_Byte
+    movwf   KS_Temp_1, A
 
-    movf    POSTINC0, w, A        ; Get W[i-4] byte 2
-    xorwf   Temp_2, w, A          
-    movwf   POSTINC1, A           
+    movf    KS_Temp_2, w, A
+    call    SBOX_Encrypt_Byte
+    movwf   KS_Temp_2, A
 
-    movf    POSTINC0, w, A        ; Get W[i-4] byte 3
-    xorwf   Temp_3, w, A          
-    movwf   POSTINC1, A
+    movf    KS_Temp_3, w, A
+    call    SBOX_Encrypt_Byte
+    movwf   KS_Temp_3, A
+    
+    ; --- STEP A.3: Rcon XOR ---
+    movf    KS_round_idx, w, A
+    call    Get_Rcon         ; WREG = Rcon[round_idx]
+    
+    ; XOR Rcon with the FIRST byte of the substituted word
+    xorwf   KS_Temp_0, f, A
 
-; --- STEP C: GENERATE W[i+1], W[i+2], W[i+3] ---
+    ; --- STEP B: GENERATE W[i] (Word 4) ---
+    movf    POSTINC0, w, A   ; Get W[0] byte 0 (0x2B)
+    xorwf   KS_Temp_0, w, A  ; XOR with G-func byte 0
+    movwf   POSTINC1, A      ; Result -> 0xA0
+
+    movf    POSTINC0, w, A   ; Get W[0] byte 1 (0x7E)
+    xorwf   KS_Temp_1, w, A  ; XOR with G-func byte 1
+    movwf   POSTINC1, A      ; Result -> 0xFA
+
+    movf    POSTINC0, w, A   ; Get W[0] byte 2 (0x15)
+    xorwf   KS_Temp_2, w, A  ; XOR with G-func byte 2
+    movwf   POSTINC1, A      ; Result -> 0xFE (Target)
+
+    movf    POSTINC0, w, A   ; Get W[0] byte 3 (0x16)
+    xorwf   KS_Temp_3, w, A  ; XOR with G-func byte 3
+    movwf   POSTINC1, A      ; Result -> 0x17
+
+    ; --- STEP C: GENERATE W[i+1], W[i+2], W[i+3] ---
     movlw   12              ; 3 words * 4 bytes = 12 bytes
-    movwf   count_reg, A          
+    movwf   KS_count_reg, A          
 
 XOR_Chain:
-    movlw   -4              ; Always look back exactly 4 bytes from current FSR1
-    movf    PLUSW1, w, A    ; Get byte from W[i-1]
-    xorwf   POSTINC0, w, A  ; XOR with W[i-4] (POSTINC0 handles the i-4 pointer)
-    movwf   POSTINC1, A     ; Store result to W[i], move FSR1 forward
-    decfsz  count_reg, f, A
+    ; 1. Get the byte we JUST wrote (which is W[i-1])
+    ; Since FSR1 is pointing at the NEXT empty slot, -4 is the previous word
+    movlw   252             ; Offset -4
+    movf    PLUSW1, w, A    ; WREG = Round_Keys[i-4] relative to FSR1
+    
+    ; 2. XOR it with the word from 4 positions ago (W[i-4])
+    ; FSR0 is already pointing at the start of W[i-4] because Step B finished there
+    xorwf   POSTINC0, w, A  
+    
+    ; 3. Store the result into the current slot and move FSR1 forward
+    movwf   POSTINC1, A     
+    
+    decfsz  KS_count_reg, f, A
     bra     XOR_Chain
 
-; --- LOOP CONTROL ---
-    incf    round_idx, f, A       ; Increment round counter
+    ; --- LOOP CONTROL ---
+    incf    KS_round_idx, f, A       ; Increment round counter
     movlw   10                    ; AES-128 does 10 expansion rounds
-    cpfseq  round_idx, A          ; Compare and skip if round_idx == 10
+    cpfseq  KS_round_idx, A          ; Compare and skip if round_idx == 10
     bra     Main_Expansion_Loop   ; Loop back if not finished
     return
 
@@ -122,21 +128,18 @@ XOR_Chain:
 
 Get_Rcon:
     ; Input: WREG = round_idx
-
-    movwf   Temp_2, A
-
-    movlw   LOW(Rcon_Table)
-    addwf   Temp_2, W, A
+    ; Use WREG and TBLPTR directly to avoid touching KS_Temp variables
+    addlw   LOW(Rcon_Table)
     movwf   TBLPTRL, A
-
+    
     movlw   HIGH(Rcon_Table)
     movwf   TBLPTRH, A
-
+    
     movlw   (Rcon_Table >> 16) & 0xFF
     movwf   TBLPTRU, A
-
+    
     tblrd*
-    movf    TABLAT, W, A
+    movf    TABLAT, W, A    ; Result returned in WREG
     return
 
 Test_Run_Expansion:
@@ -144,10 +147,10 @@ Test_Run_Expansion:
     lfsr    0, pkg_buffer
     lfsr    1, Key_Buffer
     movlw   16
-    movwf   count_reg, A
+    movwf   KS_count_reg, A
 Copy_Master_Key:
     movff   POSTINC0, POSTINC1
-    decfsz  count_reg, f, A
+    decfsz  KS_count_reg, f, A
     bra     Copy_Master_Key
     
     ; Now run the schedule with correct master key
@@ -157,10 +160,10 @@ Copy_Master_Key:
     lfsr    0, Round_Keys
     lfsr    1, pkg_buffer
     movlw   16
-    movwf   count_reg, A
+    movwf   KS_count_reg, A
 Copy_Round_Key_Back:
     movff   POSTINC0, POSTINC1
-    decfsz  count_reg, f, A
+    decfsz  KS_count_reg, f, A
     bra     Copy_Round_Key_Back
     
     nop  ; breakpoint here
