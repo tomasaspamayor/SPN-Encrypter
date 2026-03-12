@@ -12,6 +12,9 @@ CLEAR_CNT:   ds 1          ; Counter for clearing buffer
 n_cycles:    ds 1          ; Counter for number of encryption cycles
 current_key: ds 1	   ; Current key (0-10)
 
+; Reset vector - must be at address 0x0000
+psect   reset_vec, class=CODE, reloc=2
+    goto    Setup
 
 psect   code
 Setup:
