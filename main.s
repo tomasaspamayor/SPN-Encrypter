@@ -25,7 +25,7 @@ Encrypt:
 	
         ; mix first key
 	movlw	0x00
-	movwf	current_key
+	movwf	current_key, A
 	
 	call	Mix_Key
 	
@@ -47,7 +47,7 @@ Decrypt:
 
         ; mix last key
 	movlw	0x0A
-	movwf	current_key
+	movwf	current_key, A
 	
 	call	Mix_Key
 

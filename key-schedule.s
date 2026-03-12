@@ -5,7 +5,7 @@
 global  Key_Schedule, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
 extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box byte routine (WREG in/out)
 
-psect   udata_acs_ks, class=COMRAM ; Use a unique name for this psect
+psect   udata_acs ; Use same psect as other modules to avoid memory overlap
 KS_count_reg: ds 1   ; Renamed to avoid S-Box 'COUNT' conflict
 KS_round_idx: ds 1
 KS_Temp_0:    ds 1   ; Renamed to avoid S-Box 'TEMP' conflict
