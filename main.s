@@ -20,6 +20,7 @@ psect   code
 Setup:
         call    UART_Setup          ; Initialize UART
         call    Key_Setup		    ; generate key
+	bra	Loop
         ; generate keys and start scheduling
 
 Encrypt:
@@ -42,6 +43,8 @@ Encrypt:
 
         decfsz  n_cycles, F, A         ; Decrement cycle counter, skip if zero
         bra     Encrypt_Loop
+	
+	return
 
 
 Decrypt: 
@@ -64,6 +67,8 @@ Decrypt:
 
         decfsz  n_cycles, F, A         ; Decrement cycle counter, skip if zero
         bra     Decrypt_Loop
+	
+	return
 
 Loop:
         lfsr    2, pkg_buffer       ; FSR2 points to start of buffer

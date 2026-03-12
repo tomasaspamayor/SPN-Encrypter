@@ -1,7 +1,7 @@
 #include <xc.inc>
 
 global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package
-extrn   pkg_buffer, Round_Keys
+extrn   pkg_buffer
 
 psect	udata_acs   ; reserve data space in access ram
 UART_counter: ds    1	    ; reserve 1 byte for variable UART_counter
@@ -76,7 +76,7 @@ Handle_Framing:
     bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
 
 UART_Send_Package:
-    lfsr    2, Round_Keys+0x20   ; second 16-byte block (round key 1)
+    lfsr    2, pkg_buffer   ; second 16-byte block (round key 1)
     movlw   16
     call    UART_Transmit_Message
     return
