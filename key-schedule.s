@@ -127,13 +127,19 @@ XOR_Chain:
 ; --- SUBROUTINES ---
 
 Get_Rcon:
-    ; Input: WREG = round_idx
-    ; Use WREG and TBLPTR directly to avoid touching KS_Temp variables
-    addlw   LOW(Rcon_Table)
-    movwf   TBLPTRL, A
+    ; Input: WREG = round_idx (0-9)
+    ; Output: WREG = Rcon value
+    ; Save round_idx and calculate table address properly
+    movwf   TBLPTRL, A      ; Temporarily store round_idx
+    
+    ; Set up base address of Rcon_Table
+    movlw   LOW(Rcon_Table)
+    addwf   TBLPTRL, f, A   ; TBLPTRL = LOW(Rcon_Table) + round_idx
     
     movlw   HIGH(Rcon_Table)
     movwf   TBLPTRH, A
+    btfsc   STATUS, 0, A    ; Check carry flag from previous add
+    incf    TBLPTRH, f, A   ; Add carry to high byte if needed
     
     movlw   (Rcon_Table >> 16) & 0xFF
     movwf   TBLPTRU, A
