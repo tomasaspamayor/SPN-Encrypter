@@ -2,7 +2,7 @@
 
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
-global  Key_Schedule, Test_Run_Expansion, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
+global  Key_Schedule, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
 extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box byte routine (WREG in/out)
 
 psect   udata_acs_ks, class=COMRAM ; Use a unique name for this psect
@@ -21,7 +21,7 @@ psect    ks_code,class=CODE
 Rcon_Table:
     db 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36 ; Rcon values for AES-128
 
-Key_Schedule:
+Schedule_Setup:
     ; 1. Copy Master Key (16 bytes) from Key_Buffer to Round_Keys[0..15]
     lfsr    0, Key_Buffer ; FSR0 points to start of master key
     lfsr    1, Round_Keys ; FSR1 points to start of round keys
@@ -142,7 +142,7 @@ Get_Rcon:
     movf    TABLAT, W, A    ; Result returned in WREG
     return
 
-Test_Run_Expansion:
+Key_Schedule:
     ; Copy pkg_buffer (received master key) to Key_Buffer
     lfsr    0, pkg_buffer
     lfsr    1, Key_Buffer
@@ -154,7 +154,7 @@ Copy_Master_Key:
     bra     Copy_Master_Key
     
     ; Now run the schedule with correct master key
-    call    Key_Schedule
+    call    Schedule_Setup
     
     ; Copy Round_Keys[0:15] (first round key = master key) back to pkg_buffer
     lfsr    0, Round_Keys
