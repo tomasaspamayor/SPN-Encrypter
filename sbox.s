@@ -162,11 +162,12 @@ SBOX_INVERSE_DATA:
 ;
 ; Input:  WREG = byte to substitute
 ; Output: WREG = substituted value
-; Destroys: WREG, TBLPTR, TABLAT
+; Destroys: WREG, TBLPTR, TABLAT, PRODL
 ;----------------------------------------------------------
 SBOX_Encrypt_Byte:
     ; Input is in WREG
-    movwf   TEMP, A
+    ; Use PRODL instead of TEMP to avoid memory conflicts with key-schedule
+    movwf   PRODL, A
 
     movlw   LOW(SBOX_DATA)
     movwf   TBLPTRL, A
@@ -175,7 +176,7 @@ SBOX_Encrypt_Byte:
     movlw   (SBOX_DATA >> 16) & 0xFF
     movwf   TBLPTRU, A
 
-    movf    TEMP, W, A
+    movf    PRODL, W, A
     addwf   TBLPTRL, F, A
     movlw   0
     addwfc  TBLPTRH, F, A
