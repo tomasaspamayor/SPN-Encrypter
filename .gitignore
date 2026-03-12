@@ -21,3 +21,6 @@ funclist
 nbproject/Makefile-*
 disassembly/
 *.map
+_build/*
+.vscode/*
+cmake/*
