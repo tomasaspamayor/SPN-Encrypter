@@ -22,7 +22,7 @@ Key_Setup: ; test key
 	movf	key_count, W, A    
 	movwf	POSTINC0, A	   ; store incremental test values
 	decfsz	key_count, F, A    ; decrement count, and skip next if equal to zero
-	goto	Key_Loop
+	bra	Key_Loop
 	
 	call	Key_Schedule
 	return
