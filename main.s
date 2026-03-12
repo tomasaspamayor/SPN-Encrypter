@@ -12,7 +12,7 @@ CLEAR_CNT:   ds 1          ; Counter for clearing buffer
 n_cycles:    ds 1          ; Counter for number of encryption cycles
 current_key: ds 1	   ; Current key (0-10)
 
-; Reset vector - must be at address 0x0000
+; Reset vector
 psect   reset_vec, class=CODE, reloc=2
     goto    Setup
 
@@ -78,7 +78,7 @@ Loop:
 
 Clear_Loop:
         movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
-        decfsz  WREG, F, A             ; Decrement counter, skip if zero
+        decfsz  CLEAR_CNT, F, A             ; Decrement counter, skip if zero
         bra     Clear_Loop
 
         call    UART_Receive_Package
