@@ -31,6 +31,8 @@ Mix_Key:
 	lfsr	0, pkg_buffer
 	lfsr	1, Round_Keys
 	
+	movf	current_key, W, A
+	
 	; multiply key number by 16
 	movwf   key_idx, A
 	rlncf   key_idx, F, A

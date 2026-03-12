@@ -4,7 +4,7 @@ global  pkg_buffer, current_key
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
-extrn   P_Box_Enc, P_Box_Dec
+extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
 
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -24,7 +24,7 @@ Setup:
         ; generate keys and start scheduling
 
 Encrypt:
-        movlw  10                  ; Number of encryption cycles
+        movlw  9                  ; Number of encryption cycles
         movwf  n_cycles, A         ; Store in cycle counter variable
 	
         ; mix first key
@@ -44,29 +44,41 @@ Encrypt:
         decfsz  n_cycles, F, A         ; Decrement cycle counter, skip if zero
         bra     Encrypt_Loop
 	
+	; final round 
+	call	SBOX_Encrypt_Buffer
+	call	Shift_Rows
+	
+	incf	current_key, F, A
+	call	Mix_Key
+	
 	return
 
 
 Decrypt: 
-        movlw   10                   ; Number of decryption cycles
+        movlw   9                   ; Number of decryption cycles
         movwf   n_cycles, A          ; Store in cycle counter variable
 
         ; mix last key
 	movlw	0x0A
 	movwf	current_key, A
 	
-	call	Mix_Key
+	call	Unshift_Rows 
+	call	SBOX_Decrypt_Buffer
 
     Decrypt_Loop:
-        call    P_Box_Dec
-        call    SBOX_Decrypt_Buffer
-
         ; mix all other keys
 	decf	current_key, F, A
 	call	Mix_Key
+	
+        call    P_Box_Dec
+        call    SBOX_Decrypt_Buffer
 
         decfsz  n_cycles, F, A         ; Decrement cycle counter, skip if zero
         bra     Decrypt_Loop
+	
+	; final round
+	decf    current_key, F, A      ; Key pointer is now 0 (Master Key)
+        call    Mix_Key
 	
 	return
 
@@ -86,8 +98,7 @@ Clear_Loop:
         ; either encryopt or decrypt the package based on some condition 
 
         call    Encrypt
-
-        call    Decrypt
+	call	Decrypt 
 
         call    UART_Send_Package
 
