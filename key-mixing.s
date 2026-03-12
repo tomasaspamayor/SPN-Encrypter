@@ -41,7 +41,7 @@ Mix_Key:
 	; offset the FSR pointers
 	movf	key_idx, W, A
 	addwf	FSR1L, F, A 
-	movlw	0   ; to correct overflow (add carry to high pointer)
+	movlw	0   ; to correct overflow (add carry to high pointer) --Error prone
 	addwfc	FSR1H, F, A
 
 	movlw	0x10		; for 16 bytes
