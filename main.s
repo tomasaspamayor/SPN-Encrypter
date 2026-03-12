@@ -61,6 +61,7 @@ Decrypt:
         ; mix last key
 	movlw	0x0A
 	movwf	current_key, A
+	call	Mix_Key
 	
 	call	Unshift_Rows 
 	call	SBOX_Decrypt_Buffer
