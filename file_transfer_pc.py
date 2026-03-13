@@ -122,9 +122,10 @@ class FileTransfer():
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
-                    if packet_count % 1000 == 0:
+                    if packet_count < 10:
                         print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
-                    
+                    if packet_count == 10:
+                        print("(additional packets will not be printed to avoid console overflow)")
                     ser.write(send_packet)
 
                     # Read raw bytes from hardware
