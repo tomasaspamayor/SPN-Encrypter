@@ -24,3 +24,5 @@ disassembly/
 _build/*
 .vscode/*
 cmake/*
+*.jpg
+*.txt

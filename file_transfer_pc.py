@@ -14,6 +14,9 @@ class FileTransfer():
     sending data to the PIC, receiving responses, and writing responses to a local file.
     The class also includes error handling for common issues that may arise during the process.
 
+    Files ending in .txt are interpreted as hexadecimal text dumps. Any other file type,
+    including .jpg, is transferred as raw binary data.
+
     Attributes:
         send_path (str): Path to the local file to send to the PIC.
         receive_path (str): Path to the local file to save the response from the PIC.
@@ -27,6 +30,47 @@ class FileTransfer():
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.packet_size = packet_size
+
+    def _uses_hex_text_format(self, path):
+        """
+        Determines if the file at the given path should be treated as a hexadecimal text dump
+        based on its extension.
+        
+        Args:
+            path (str): The file path to check.
+        Returns:
+            bool: True if the file should be treated as a hexadecimal text dump, False otherwise.
+        """
+        return os.path.splitext(path)[1].lower() == ".txt"
+
+    def _read_input_data(self):
+        """
+        Reads the input data from the file specified by send_path.
+
+        Returns:
+            bytes: The raw bytes read from the input file.
+        """
+        if self._uses_hex_text_format(self.send_path):
+            with open(self.send_path, "r", encoding="utf-8") as file_obj:
+                raw_text = file_obj.read()
+                return bytes.fromhex("".join(raw_text.split()))
+
+        with open(self.send_path, "rb") as file_obj:
+            return file_obj.read()
+
+    def _write_output_packet(self, file_obj, packet):
+        """
+        Writes a packet to the output file.
+
+        Args:
+            file_obj: The file object to write to.
+            packet (bytes): The packet to write.
+        """
+        if self._uses_hex_text_format(self.receive_path):
+            file_obj.write(packet.hex() + "\n")
+            return
+
+        file_obj.write(packet)
 
     def file_exchange(self):
         """
@@ -48,29 +92,29 @@ class FileTransfer():
             serial.SerialException: If there are issues with the serial connection.
             IOError: If there are issues reading/writing to the local drive.
         """
-        # --- 1. READ: Convert the input hex-string file into actual binary data ---
         if not os.path.exists(self.send_path):
             print(f"Error: File '{self.send_path}' not found.")
             return
 
         try:
-            with open(self.send_path, "r", encoding="utf-8") as f:
-                raw_text = f.read()
-                # Remove spaces/newlines and convert to actual bytes
-                data = bytes.fromhex("".join(raw_text.split()))
+            data = self._read_input_data()
         except ValueError:
             print("Error: Input file contains invalid hex characters.")
             return
 
-        print(f"Read {len(data)} binary bytes from hex file.")
+        input_mode = "hex-text" if self._uses_hex_text_format(self.send_path) else "binary"
+        print(f"Read {len(data)} bytes from {input_mode} input file.")
 
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=200)
 
-            # --- 2. WRITE: Open the output file in TEXT mode to save hex strings ---
-            with open(self.receive_path, 'w', encoding="utf-8") as f_recv:
+            output_mode = 'w' if self._uses_hex_text_format(self.receive_path) else 'wb'
+            output_kwargs = {"encoding": "utf-8"} if output_mode == 'w' else {}
+
+            with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
+                bytes_written = 0
 
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i : i + self.packet_size]
@@ -78,7 +122,9 @@ class FileTransfer():
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
-                    print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
+                    if packet_count % 1000 == 0:
+                        print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
+                    
                     ser.write(send_packet)
 
                     # Read raw bytes from hardware
@@ -88,14 +134,18 @@ class FileTransfer():
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
-                    # --- 3. CONVERT: Turn binary response back into hex text ---
-                    print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
-                    f_recv.write(recv_packet.hex() + "\n")
+                    #print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
+                    packet_to_write = recv_packet
+                    if not self._uses_hex_text_format(self.receive_path):
+                        remaining_bytes = len(data) - bytes_written
+                        packet_to_write = recv_packet[:remaining_bytes]
+
+                    self._write_output_packet(f_recv, packet_to_write)
+                    bytes_written += len(packet_to_write)
 
                     packet_count += 1
-                    print(f"Exchanged packet {packet_count}")
+                    #print(f"Exchanged packet {packet_count}")
 
-                # ser.write(b'\x04')
                 print(f"Exchange complete. {packet_count} packets processed.")
 
         except serial.SerialException as e:
@@ -117,8 +167,15 @@ class FileTransfer():
 
 if __name__ == "__main__":
 
-    transfer = FileTransfer(send_path='tester.txt',
-                            receive_path='tester_out.txt',
-                            serial_port='COM4')
+    file_type = 1
 
-    transfer.file_exchange()
+    if file_type == 0:  # Example usage: .TXT file.
+        transfer_txt = FileTransfer(send_path='tester.txt',
+                                receive_path='tester_out.txt',
+                                serial_port='COM4')
+        transfer_txt.file_exchange()
+    else: # Example usage: .JPG file.
+        transfer_jpg = FileTransfer(send_path='tester.jpg',
+                                receive_path='tester_out.jpg',
+                                serial_port='COM4')
+        transfer_jpg.file_exchange()
