@@ -167,7 +167,7 @@ class FileTransfer():
 
 if __name__ == "__main__":
 
-    file_type = 1
+    file_type = 0
 
     if file_type == 0:  # Example usage: .TXT file.
         transfer_txt = FileTransfer(send_path='tester.txt',
