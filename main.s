@@ -5,6 +5,7 @@ extrn   UART_Setup, UART_Receive_Package, UART_Send_Package
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
+extrn	Generate_Master_Key
 
 psect  udata_acs
 pkg_buffer:  ds 16

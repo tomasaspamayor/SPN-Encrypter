@@ -4,7 +4,7 @@
 ; use the UART receiver to sample the noise in the system, which is a common technique for TRNGs on microcontrollers.
 ; The TRNG will generate 128 bits (16 bytes) of random data and store it in a buffer for later retrieval.
 
-global  TRNG_Generate
+global  Generate_Master_Key
 extrn   Key_Buffer
 
 
@@ -15,12 +15,12 @@ psect	trng_code,class=CODE
 ; We use the WDT in interrupt mode to trigger the TRNG writing with the TMR0 setup 
 ; at its highest possible value, which will give us the most jitter.
 
-TRNG_Generate:
+Generate_Master_Key:
     lfsr    2, Key_Buffer
     movlw   16
     movwf   TRNG_counter, A
     
-    bsf     WDTCON, 0, A    ; Manually enable WDT (SWDTEN bit) if using CONFIG WDTEN=SWON
+    bsf     WDTCON, 0, A    ; Manually enable WDT (SWDTEN bit)
 
 TRNG_Generate_Loop:
     clrwdt          

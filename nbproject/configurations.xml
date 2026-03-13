@@ -26,6 +26,7 @@
       <itemPath>key-schedule.s</itemPath>
       <itemPath>p_box_dec.s</itemPath>
       <itemPath>eeprom.s</itemPath>
+      <itemPath>trng.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
