@@ -122,7 +122,9 @@ class FileTransfer():
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
-                    print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
+                    if packet_count % 1000 == 0:
+                        print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
+                    
                     ser.write(send_packet)
 
                     # Read raw bytes from hardware
@@ -132,7 +134,7 @@ class FileTransfer():
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
-                    print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
+                    #print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
                     packet_to_write = recv_packet
                     if not self._uses_hex_text_format(self.receive_path):
                         remaining_bytes = len(data) - bytes_written
@@ -142,7 +144,7 @@ class FileTransfer():
                     bytes_written += len(packet_to_write)
 
                     packet_count += 1
-                    print(f"Exchanged packet {packet_count}")
+                    #print(f"Exchanged packet {packet_count}")
 
                 print(f"Exchange complete. {packet_count} packets processed.")
 
@@ -165,7 +167,7 @@ class FileTransfer():
 
 if __name__ == "__main__":
 
-    file_type = 0
+    file_type = 1
 
     if file_type == 0:  # Example usage: .TXT file.
         transfer_txt = FileTransfer(send_path='tester.txt',
