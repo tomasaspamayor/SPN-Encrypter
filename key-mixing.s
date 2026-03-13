@@ -1,9 +1,9 @@
 ; perform key mixing stage
 #include <xc.inc>
 
-global	Key_Setup, Mix_Key
+global	Key_Setup, Key_Setup_From_TRNG, Mix_Key
 extrn	pkg_buffer, current_key  ; the storage location of the package buffer
-extrn  Key_Schedule, Key_Buffer, Round_Keys
+extrn  Key_Schedule, Key_Schedule_From_KeyBuffer, Key_Buffer, Round_Keys
     
 psect	udata_acs   ; reserve data space in access ram
 ; varaibles
@@ -25,6 +25,11 @@ Key_Setup: ; test key
 	bra	Key_Loop
 	
 	call	Key_Schedule
+	return
+
+Key_Setup_From_TRNG:
+	; Alternative setup path: preserve TRNG data already in Key_Buffer.
+	call	Key_Schedule_From_KeyBuffer
 	return
 
 Mix_Key:

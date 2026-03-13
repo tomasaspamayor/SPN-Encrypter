@@ -26,6 +26,7 @@ TRNG_Generate_Loop:
     ; or simply use a software delay to create a 'sampling window'
     movlw   0xFF
     movwf   PRODL, A           ; Use PRODL as a simple delay counter
+
 Delay_Window:
     decfsz  PRODL, F, A
     bra     Delay_Window

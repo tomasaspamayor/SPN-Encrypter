@@ -24,12 +24,22 @@ class FileTransfer():
         baud_rate (int): Baud rate for serial communication. Default is 9600.
         packet_size (int): Size of each packet in bytes. Default is 16 bytes (128 bits).
     """
-    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16):
+    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16, key_log_path=None):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.packet_size = packet_size
+        self.key_log_path = key_log_path
+
+    def _request_master_key_over_serial(self, ser):
+        """Request the current 16-byte master key over an existing serial session."""
+        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
+        ser.write(key_request)
+        key_bytes = ser.read(self.packet_size)
+        if len(key_bytes) != self.packet_size:
+            return None
+        return key_bytes
 
     def _uses_hex_text_format(self, path):
         """
@@ -116,7 +126,18 @@ class FileTransfer():
                 packet_count = 0
                 bytes_written = 0
 
+                key_file = None
+                if self.key_log_path:
+                    key_file = open(self.key_log_path, "w", encoding="utf-8")
+
                 for i in range(0, len(data), self.packet_size):
+                    if key_file:
+                        master_key = self._request_master_key_over_serial(ser)
+                        if master_key is None:
+                            print(f"Timeout while requesting key for packet {packet_count + 1}")
+                            break
+                        key_file.write(master_key.hex() + "\n")
+
                     send_packet = data[i : i + self.packet_size]
                     if len(send_packet) < self.packet_size:
                         send_packet = send_packet.ljust(self.packet_size, b'\x00')
@@ -147,6 +168,10 @@ class FileTransfer():
                     packet_count += 1
                     #print(f"Exchanged packet {packet_count}")
 
+                if key_file:
+                    key_file.close()
+                    print(f"Master keys saved to {self.key_log_path}")
+
                 print(f"Exchange complete. {packet_count} packets processed.")
 
         except serial.SerialException as e:
@@ -166,6 +191,32 @@ class FileTransfer():
                 ser.close()
                 print("Serial port safely closed.")
 
+    def request_master_key(self):
+        """Request the current 16-byte master key from firmware and print it as hex."""
+        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
+
+        ser = None
+        try:
+            ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
+            ser.write(key_request)
+            key_bytes = ser.read(self.packet_size)
+
+            if len(key_bytes) != self.packet_size:
+                print("Error: did not receive full 16-byte key response.")
+                return None
+
+            print(f"Master key (hex): {key_bytes.hex()}")
+            return key_bytes
+
+        except serial.SerialException as e:
+            print(f"Serial Error: {e}")
+            return None
+
+        finally:
+            if ser and ser.is_open:
+                ser.close()
+                print("Serial port safely closed.")
+
 if __name__ == "__main__":
 
     file_type = 0
@@ -173,10 +224,12 @@ if __name__ == "__main__":
     if file_type == 0:  # Example usage: .TXT file.
         transfer_txt = FileTransfer(send_path='tester.txt',
                                 receive_path='tester_out.txt',
-                                serial_port='COM4')
+                                serial_port='COM4',
+                                key_log_path='keys.txt')
         transfer_txt.file_exchange()
     else: # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                 receive_path='tester_out.jpg',
-                                serial_port='COM4')
+                                serial_port='COM4',
+                                key_log_path='keys.txt')
         transfer_jpg.file_exchange()
