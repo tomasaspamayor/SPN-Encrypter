@@ -20,6 +20,7 @@ psect   reset_vec, class=CODE, reloc=2
 psect   code
 Setup:
         call    UART_Setup          ; Initialize UART
+	call	Generate_Master_Key
         call    Key_Setup		    ; generate key
 	bra	Loop
         ; generate keys and start scheduling

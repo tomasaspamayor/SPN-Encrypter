@@ -19,18 +19,24 @@ Generate_Master_Key:
     lfsr    2, Key_Buffer
     movlw   16
     movwf   TRNG_counter, A
-    
-    bsf     WDTCON, 0, A    ; Manually enable WDT (SWDTEN bit)
 
 TRNG_Generate_Loop:
-    clrwdt          
-    sleep           
-    nop             
+    ; --- Entropy Generation ---
+    ; We wait for TMR1 (if configured as a slow clock) 
+    ; or simply use a software delay to create a 'sampling window'
+    movlw   0xFF
+    movwf   PRODL, A           ; Use PRODL as a simple delay counter
+Delay_Window:
+    decfsz  PRODL, F, A
+    bra     Delay_Window
 
-    movf    TMR0L, W, A     ; W = New jittered byte
-    xorwf   INDF2, W, A     ; XOR W with what's currently at FSR2
-    movwf   POSTINC2, A     ; Store result back and move FSR2 to next byte
-
+    ; --- Capture Jitter ---
+    movf    TMR0L, W, A     ; Grab the high-speed timer LSBs
+    
+    ; Whitening: XORing with the previous value helps distribute entropy
+    xorwf   POSTINC2, F, A  ; Store and move to next buffer byte
+    
     decfsz  TRNG_counter, F, A
     bra     TRNG_Generate_Loop
+    
     return
