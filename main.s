@@ -3,9 +3,8 @@
 global  pkg_buffer, current_key
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Master_Key
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
-extrn	Key_Setup, Key_Setup_From_TRNG, Mix_Key
+extrn	Key_Setup, Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
-extrn	Generate_Master_Key
 
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -20,8 +19,7 @@ psect   reset_vec, class=CODE, reloc=2
 psect   code
 Setup:
         call    UART_Setup          ; Initialize UART
-	call	Generate_Master_Key
-        call    Key_Setup		    ; generate key
+        call    Key_Setup	    ; generate key
 	bra	Loop
         ; generate keys and start scheduling
 
@@ -97,49 +95,9 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
-
-        ; Command packet to request master key:
-        ; [0xAA, 0x55, 0x4B, 0x45, 0x59, ...]
-        ; If matched, return Key_Buffer directly and skip cipher path.
-        lfsr    2, pkg_buffer
-
-        movlw   0xAA
-        cpfseq  INDF2, A
-        bra     Not_Key_Request
-
-        movlw   1
-        movf    PLUSW2, W, A
-        xorlw   0x55
-        bnz     Not_Key_Request
-
-        movlw   2
-        movf    PLUSW2, W, A
-        xorlw   0x4B
-        bnz     Not_Key_Request
-
-        movlw   3
-        movf    PLUSW2, W, A
-        xorlw   0x45
-        bnz     Not_Key_Request
-
-        movlw   4
-        movf    PLUSW2, W, A
-        xorlw   0x59
-        bnz     Not_Key_Request
-
-        ; Generate and schedule a fresh master key for the next data packet.
-        call    Generate_Master_Key
-        call    Key_Setup_From_TRNG
-        call    UART_Send_Master_Key
-        bra     Loop
-
-Not_Key_Request:
-
-        ; either encryopt or decrypt the package based on some condition 
-
-        call    Encrypt
+	call	Encrypt 
 	call	Decrypt 
-
-        call    UART_Send_Package
-
-        bra     Loop                ; Repeat indefinitely
+	
+        call    UART_Send_Master_Key
+	
+        bra     Loop

@@ -9,7 +9,8 @@ extrn   Key_Buffer
 
 
 psect	udata_acs   ; reserve data space in access ram
-TRNG_counter: ds    1	    ; reserve 1 byte for variable TRNG_counter
+TRNG_counter:	ds  1	    ; reserve 1 byte for variable TRNG_counter
+TIMER:		ds  1
 
 psect	trng_code,class=CODE
 ; We use the WDT in interrupt mode to trigger the TRNG writing with the TMR0 setup 
@@ -25,10 +26,10 @@ TRNG_Generate_Loop:
     ; We wait for TMR1 (if configured as a slow clock) 
     ; or simply use a software delay to create a 'sampling window'
     movlw   0xFF
-    movwf   PRODL, A           ; Use PRODL as a simple delay counter
+    movwf   TIMER, A           ; Use PRODL as a simple delay counter
 
 Delay_Window:
-    decfsz  PRODL, F, A
+    decfsz  TIMER, F, A
     bra     Delay_Window
 
     ; --- Capture Jitter ---

@@ -1,9 +1,10 @@
 ; perform key mixing stage
 #include <xc.inc>
 
-global	Key_Setup, Key_Setup_From_TRNG, Mix_Key
+global	Key_Setup, Mix_Key
 extrn	pkg_buffer, current_key  ; the storage location of the package buffer
-extrn  Key_Schedule, Key_Schedule_From_KeyBuffer, Key_Buffer, Round_Keys
+extrn	Key_Schedule, Key_Buffer, Round_Keys
+extrn	Generate_Master_Key
     
 psect	udata_acs   ; reserve data space in access ram
 ; varaibles
@@ -15,21 +16,18 @@ key_idx:	ds  1	; helper variable to select the current key
 psect	uart_code,class=CODE
     
 Key_Setup: ; test key 
-	lfsr    0, Key_Buffer	; point FSR0 to key 
+	lfsr    1, Key_Buffer	; point FSR0 to key 
 	movlw   0x10	
 	movwf   key_count, A    ; set count to 0 
     Key_Loop: 
-	movf	key_count, W, A    
-	movwf	POSTINC0, A	   ; store incremental test values
+	movlw	0x01   
+	movwf	POSTINC1, A
 	decfsz	key_count, F, A    ; decrement count, and skip next if equal to zero
 	bra	Key_Loop
+    
+;	call	Generate_Master_Key ; generate the master key using random key generator
 	
 	call	Key_Schedule
-	return
-
-Key_Setup_From_TRNG:
-	; Alternative setup path: preserve TRNG data already in Key_Buffer.
-	call	Key_Schedule_From_KeyBuffer
 	return
 
 Mix_Key:
