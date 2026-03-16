@@ -8,7 +8,7 @@
 ; CONFIG1L
   CONFIG  RETEN = ON            ; VREG Sleep Enable bit (Enabled)
   CONFIG  INTOSCSEL = HIGH      ; LF-INTOSC Low-power Enable bit (LF-INTOSC in High-power mode during Sleep)
-  CONFIG  SOSCSEL = DIG         ; SOSC Power Selection and mode Configuration bits (Digital IO selected)
+  CONFIG SOSCSEL = LOW		; SOSC Power Selection and mode Configuration bits (Low-power mode)
   CONFIG  XINST = OFF           ; Extended Instruction Set (Disabled)
 
 ; CONFIG1H
@@ -35,7 +35,7 @@
   CONFIG  WAIT = OFF            ; External Bus Wait (Disabled)
 
 ; CONFIG3H
-  CONFIG  CCP2MX = PORTC        ; CCP2 Mux (RC1)
+  CONFIG  CCP2MX = PORTBE        ; CCP2 Mux (RC1)
   CONFIG  ECCPMX = PORTE        ; ECCP Mux (Enhanced CCP1/3 [P1B/P1C/P3B/P3C] muxed with RE6/RE5/RE4/RE3)
   CONFIG  MSSPMSK = 1		; MSSP address masking (7 Bit address masking mode)
   CONFIG  MCLRE = ON            ; Master Clear Enable (MCLR Enabled, RG5 Disabled)
