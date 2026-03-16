@@ -1,9 +1,9 @@
 ; perform key mixing stage
 #include <xc.inc>
 
-global	Key_Setup, Mix_Key
+global	Key_Setup, Mix_Key, Key_Buffer, Round_Keys
 extrn	pkg_buffer, current_key  ; the storage location of the package buffer
-extrn	Key_Schedule, Key_Buffer, Round_Keys
+extrn	Key_Schedule
 extrn	Generate_Master_Key
     
 psect	udata_acs   ; reserve data space in access ram
@@ -12,20 +12,24 @@ key_count:	ds  1	; counting variable for key generation
 mix_count:	ds  1	; counting variable for XOR loop
 key_idx:	ds  1	; helper variable to select the current key
 
+psect	udata
+Key_Buffer:	ds  16
+Round_Keys:	ds  176
+
     
 psect	uart_code,class=CODE
     
 Key_Setup: ; test key 
-	lfsr    1, Key_Buffer	; point FSR0 to key 
-	movlw   0x10	
-	movwf   key_count, A    ; set count to 0 
-    Key_Loop: 
-	movlw	0x01   
-	movwf	POSTINC1, A
-	decfsz	key_count, F, A    ; decrement count, and skip next if equal to zero
-	bra	Key_Loop
+;	lfsr    1, Key_Buffer	; point FSR0 to key 
+;	movlw   0x10	
+;	movwf   key_count, A    ; set count to 0 
+;    Key_Loop: 
+;	movlw	0x09   
+;	movwf	POSTINC1, A
+;	decfsz	key_count, F, A    ; decrement count, and skip next if equal to zero
+;	bra	Key_Loop
     
-;	call	Generate_Master_Key ; generate the master key using random key generator
+	call	Generate_Master_Key ; generate the master key using random key generator
 	
 	call	Key_Schedule
 	return

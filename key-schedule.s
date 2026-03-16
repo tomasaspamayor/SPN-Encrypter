@@ -2,8 +2,8 @@
 
 ; This module implements the key schedule for the SPN cipher. It generates round keys from the initial key using a specific algorithm.
 
-global  Key_Schedule, Key_Buffer, Round_Keys ; We need to make the key schedule function available to other modules
-extrn   SBOX_Encrypt_Byte, pkg_buffer ; External S-Box byte routine (WREG in/out)
+global  Key_Schedule ; We need to make the key schedule function available to other modules
+extrn   SBOX_Encrypt_Byte, Key_Buffer, Round_Keys ; External S-Box byte routine (WREG in/out)
 
 psect   udata_acs ; Use same psect as other modules to avoid memory overlap
 KS_count_reg: ds 1   ; Renamed to avoid S-Box 'COUNT' conflict
@@ -14,8 +14,7 @@ KS_Temp_2:    ds 1
 KS_Temp_3:    ds 1
 
 psect   udata
-Key_Buffer: ds 16
-Round_Keys: ds 176
+
 
 psect    ks_code,class=CODE
 Rcon_Table:
@@ -27,7 +26,7 @@ Schedule_Setup:
     lfsr    1, Round_Keys ; FSR1 points to start of round keys
     movlw   16 ; Number of bytes to copy
     movwf   KS_count_reg, A ; Store in counter variable
-
+    
 Copy_Master:
     movff   POSTINC0, POSTINC1 ; Copy byte and increment both pointers
     decfsz  KS_count_reg, f, A ; Decrement counter, skip if zero
@@ -148,35 +147,7 @@ Get_Rcon:
     movf    TABLAT, W, A    ; Result returned in WREG
     return
 
-Key_Schedule:
-    ; Copy pkg_buffer (received master key) to Key_Buffer
-    lfsr    0, pkg_buffer
-    lfsr    1, Key_Buffer
-    movlw   16
-    movwf   KS_count_reg, A
-Copy_Master_Key:
-    movff   POSTINC0, POSTINC1
-    decfsz  KS_count_reg, f, A
-    bra     Copy_Master_Key
-    
-    ; Now run the schedule with correct master key
+Key_Schedule:    
     call    Schedule_Setup
-    
-    ; Copy Round_Keys[0:15] (first round key = master key) back to pkg_buffer
-    lfsr    0, Round_Keys
-    lfsr    1, pkg_buffer
-    movlw   16
-    movwf   KS_count_reg, A
-Copy_Round_Key_Back:
-    movff   POSTINC0, POSTINC1
-    decfsz  KS_count_reg, f, A
-    bra     Copy_Round_Key_Back
-    
-    nop  ; breakpoint here
     return
 
-Key_Schedule_From_KeyBuffer:
-    ; Non-destructive path: keep existing Key_Schedule logic intact,
-    ; but allow expansion directly from the current Key_Buffer.
-    call    Schedule_Setup
-    return

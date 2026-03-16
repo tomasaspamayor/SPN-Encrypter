@@ -18,7 +18,7 @@ psect	trng_code,class=CODE
 
 Generate_Master_Key:
     lfsr    2, Key_Buffer
-    movlw   16
+    movlw   128
     movwf   TRNG_counter, A
 
 TRNG_Generate_Loop:
@@ -36,7 +36,9 @@ Delay_Window:
     movf    TMR0L, W, A     ; Grab the high-speed timer LSBs
     
     ; Whitening: XORing with the previous value helps distribute entropy
-    xorwf   POSTINC2, F, A  ; Store and move to next buffer byte
+;    xorwf   POSTINC2, F, A  ; Store and move to next buffer byte
+    
+    movwf   POSTINC2, A
     
     decfsz  TRNG_counter, F, A
     bra     TRNG_Generate_Loop
