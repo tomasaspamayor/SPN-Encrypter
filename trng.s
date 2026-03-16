@@ -11,6 +11,9 @@ extrn   Key_Buffer
 psect	udata_acs   ; reserve data space in access ram
 TRNG_counter:	ds  1	    ; reserve 1 byte for variable TRNG_counter
 TIMER:		ds  1
+TR_count_reg:	ds  1
+TR_Temp_0:		ds  1
+    
 
 psect	trng_code,class=CODE
 ; We use the WDT in interrupt mode to trigger the TRNG writing with the TMR0 setup 
@@ -18,7 +21,12 @@ psect	trng_code,class=CODE
 
 Generate_Master_Key:
     lfsr    2, Key_Buffer
-    movlw   128
+    movlw   16
+    movwf   TR_count_reg, A
+    
+Byte_Loop:
+    clrf    TR_Temp_0, A    ; Clear our "bit accumulator"
+    movlw   8               ; 8 bits per byte
     movwf   TRNG_counter, A
 
 TRNG_Generate_Loop:
@@ -34,13 +42,17 @@ Delay_Window:
 
     ; --- Capture Jitter ---
     movf    TMR0L, W, A     ; Grab the high-speed timer LSBs
+    andlw   0x01
     
-    ; Whitening: XORing with the previous value helps distribute entropy
-;    xorwf   POSTINC2, F, A  ; Store and move to next buffer byte
-    
-    movwf   POSTINC2, A
+    rlncf   TR_Temp_0, F, A ; Rotate Left (KS_Temp_0 << 1)
+    iorwf   TR_Temp_0, F, A ; KS_Temp_0 = KS_Temp_0 | new_bit
     
     decfsz  TRNG_counter, F, A
     bra     TRNG_Generate_Loop
+    
+    movff   TR_Temp_0, POSTINC2
+    
+    decfsz  TR_count_reg, F, A
+    bra     Byte_Loop
     
     return
