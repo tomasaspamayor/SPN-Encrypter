@@ -6,6 +6,10 @@ extrn   pkg_buffer, Round_Keys, encryption_timer, decryption_timer
 psect	udata_acs   ; reserve data space in access ram
 UART_counter: ds    1	    ; reserve 1 byte for variable UART_counter
 rx_counter: ds  1       ; reserve 1 byte for variable rx_counter
+rx_checksum: ds 1
+tx_checksum: ds 1
+session_active: ds 1
+rx_first_byte: ds 1
 
 psect	uart_code,class=CODE
 UART_Setup:
@@ -18,6 +22,9 @@ UART_Setup:
     movwf   SPBRG1, A	; set baud rate
     bsf	    TRISC, PORTC_TX1_POSN, A	; TX1 pin is output on RC6 pin
 					; must set TRISC6 to 1
+    clrf    session_active, A
+    clrf    rx_checksum, A
+    clrf    tx_checksum, A
     return
 
 UART_Transmit_Message:	    ; Message stored at FSR2, length stored in W
@@ -36,60 +43,109 @@ UART_Transmit_Byte:	    ; Transmits byte stored in W
     movwf   TXREG1, A
     return
 
+UART_Receive_Byte:
+    btfss   PIR1, 5, A           ; RC1IF = bit 5 of PIR1
+    bra     UART_Receive_Byte
+    movf    RCREG1, W, A
+    return
+
 UART_Receive_Package:
-    ; --- Initialization ---
-    lfsr    2, pkg_buffer    ; Point FSR2 to the start of our 16-byte RAM
-    movlw   16              ; We expect exactly 16 bytes (128 bits)
+    ; Session framing expected by PC side:
+    ; SOT (0x02), then N * (16-byte payload + 1-byte checksum), then EOT (0x04)
+    bsf     RCSTA1, 4, A
+
+    btfsc   session_active, 0, A
+    bra     RX_Read_First
+
+RX_Wait_SOT:
+    call    UART_Receive_Byte
+    xorlw   0x02
+    bnz     RX_Wait_SOT
+    movlw   0x02                    ; ACK SOT to host
+    call    UART_Transmit_Byte
+    bsf     session_active, 0, A
+
+RX_Read_First:
+    call    UART_Receive_Byte
+    movwf   rx_first_byte, A
+
+    ; If session terminator arrives, ACK and wait for next session.
+    movf    rx_first_byte, W, A
+    xorlw   0x04
+    bz      RX_Handle_EOT
+
+    lfsr    2, pkg_buffer
+    movlw   16
     movwf   rx_counter, A
-    bsf RCSTA1, 4, A   ; Enable Continuous Receive
-    bsf RCSTA1, 4, A   ; Enable Continuous Receive
+    clrf    rx_checksum, A
 
-Wait_Byte:
-    ; --- Error Checking ---
-;    btfsc   RCSTA1, 1, A   ; OERR = bit 1 of RCSTA1
-;    bra     Handle_Overrun
-;    btfsc   RCSTA1, 2, A   ; FERR = bit 2 of RCSTA1
-;    bra     Handle_Framing
+    movf    rx_first_byte, W, A
+    addwf   rx_checksum, F, A
+    movwf   POSTINC2, A
+    decfsz  rx_counter, A
+    bra     RX_Read_Remaining
+    bra     RX_Read_Checksum
 
-    ; --- Wait for Data ---
-    btfss   PIR1, 5, A   ; RC1IF = bit 5 of PIR1
-    bra     Wait_Byte       ; Keep polling until a byte is received
+RX_Read_Remaining:
+    call    UART_Receive_Byte
+    addwf   rx_checksum, F, A
+    movwf   POSTINC2, A
+    decfsz  rx_counter, A
+    bra     RX_Read_Remaining
 
-    ; --- Store Data ---
-    movf    RCREG1, W, A    ; Read the byte (also clears RC1IF)
-    movwf   POSTINC2, A     ; Store in buffer and increment pointer
+RX_Read_Checksum:
+    call    UART_Receive_Byte       ; received checksum in W
+    cpfseq  rx_checksum, A          ; compare with computed checksum
+    bra     UART_Receive_Package    ; invalid packet: drop and resync
 
-    decfsz  rx_counter, A   ; Decrement loop counter
-    bra     Wait_Byte       ; Get next byte if not finished
+    return
 
-    return                  ; Buffer is now full (16 bytes received)
+RX_Handle_EOT:
+    movlw   0x04                    ; ACK EOT to host
+    call    UART_Transmit_Byte
+    bcf     session_active, 0, A
+    bra     UART_Receive_Package
 
 Handle_Overrun:
     bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
     bsf     RCSTA1, 4, A
     bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
     bsf     RCSTA1, 4, A
-    bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
+    bra     UART_Receive_Package    ; Continue (current packet is likely corrupted)
 
 Handle_Framing:
     movf    RCREG1, W, A    ; Read RCREG to clear the error
-    bra     Wait_Byte       ; Continue (Note: current packet is likely corrupted)
+    bra     UART_Receive_Package    ; Continue (current packet is likely corrupted)
 
 UART_Send_Package:
     lfsr    2, pkg_buffer   
     movlw   16
-    call    UART_Transmit_Message
+    clrf    tx_checksum, A
+    call    UART_Transmit_Message_With_Checksum
     return
 
 UART_Send_Round_Keys:
     lfsr    2, Round_Keys
     movlw   176
-    call    UART_Transmit_Message
+    call    UART_Transmit_Message_With_Checksum
+    movf    tx_checksum, W, A
+    call    UART_Transmit_Byte
     return
 
 UART_Send_Timers:
     ; Sends 4 bytes: enc_timer_low, enc_timer_high, dec_timer_low, dec_timer_high
     lfsr    2, encryption_timer
     movlw   4
-    call    UART_Transmit_Message
+    call    UART_Transmit_Message_With_Checksum
+    return
+
+UART_Transmit_Message_With_Checksum:
+    movwf   UART_counter, A
+
+UART_WithChecksum_Loop:
+    movf    POSTINC2, W, A
+    addwf   tx_checksum, F, A
+    call    UART_Transmit_Byte
+    decfsz  UART_counter, A
+    bra     UART_WithChecksum_Loop
     return

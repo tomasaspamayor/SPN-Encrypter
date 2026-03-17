@@ -193,6 +193,7 @@ class FileTransfer():
             with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
                 bytes_written = 0
+                transfer_ok = True
 
                 key_file = None
                 if self.key_log_path:
@@ -238,6 +239,7 @@ class FileTransfer():
 
                     if recv_total is None or len(recv_total) < recv_total_len:
                         print(f"Timeout at packet {packet_count + 1}")
+                        transfer_ok = False
                         break
 
                     recv_packet = recv_total[:self.packet_size]
@@ -269,7 +271,7 @@ class FileTransfer():
                     packet_count += 1
                     # print(f"Exchanged packet {packet_count}")
 
-                if self.use_framing:
+                if self.use_framing and transfer_ok:
                     self._send_eot(ser)
                     if not self._expect_eot(ser):
                         print("Frame error: did not receive EOT from device.")
