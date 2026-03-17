@@ -145,9 +145,12 @@ class FileTransfer():
                     recv_packet = recv_total[:self.packet_size]
                     enc_ticks = int.from_bytes(recv_total[self.packet_size:self.packet_size + 2], 'little')
                     dec_ticks = int.from_bytes(recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
-                    enc_us = enc_ticks * 0.5
-                    dec_us = dec_ticks * 0.5
-                    print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.1f} \u00b5s, decrypt: {dec_us:.1f} \u00b5s")
+                      # 1 tick = 62.5 ns at Fcy=16 MHz with 1:1 TMR1 prescale
+                    enc_us = enc_ticks * 0.0625
+                    dec_us = dec_ticks * 0.0625
+                    print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
+                          f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks) "
+                          f"[raw: {recv_total[self.packet_size:self.packet_size+4].hex()}]")
                     if timing_file:
                         timing_file.write(f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f}\n")
 

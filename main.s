@@ -25,7 +25,9 @@ Setup:
 
         ; Configure TMR1: internal clock (Fosc/4), 1:8 prescale, 16-bit r/w, OFF initially
         ; T1CON: RD16=1, T1CKPS=11 (1:8), T1OSCEN=0, T1SYNC=0, TMR1CS=00, TMR1ON=0
-        movlw   0b10110000
+        ; T1CON: RD16=1, T1CKPS=00 (1:1), T1OSCEN=0, T1SYNC=0, TMR1CS=00, TMR1ON=0
+        ; 1 tick = 1/Fcy = 62.5 ns at 16 MHz; max range ~4 ms (well within cipher time)
+        movlw   0b10000000
         movwf   T1CON, A
 
 	bra	Loop
@@ -108,17 +110,21 @@ Clear_Loop:
 
         clrf    TMR1H, A
         clrf    TMR1L, A
-        bsf     T1CON, 0, A
+        movlw   0b10000001          ; RD16=1, 1:1 prescale, TMR1ON=1 — start timer
+        movwf   T1CON, A
         call    Encrypt
-        bcf     T1CON, 0, A
+        movlw   0b10000000          ; TMR1ON=0 — stop timer
+        movwf   T1CON, A
         movff   TMR1L, encryption_timer
         movff   TMR1H, encryption_timer+1
 
         clrf    TMR1H, A
         clrf    TMR1L, A
-        bsf     T1CON, 0, A
+        movlw   0b10000001          ; start timer
+        movwf   T1CON, A
         call    Decrypt
-        bcf     T1CON, 0, A
+        movlw   0b10000000          ; stop timer
+        movwf   T1CON, A
         movff   TMR1L, decryption_timer
         movff   TMR1H, decryption_timer+1
 
