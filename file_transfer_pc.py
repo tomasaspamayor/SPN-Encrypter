@@ -145,14 +145,6 @@ class FileTransfer():
                     timing_file.write("packet,encrypt_us,decrypt_us\n")
 
                 for i in range(0, len(data), self.packet_size):
-                    if key_file:
-                        master_key = self._request_master_key_over_serial(ser)
-                        if master_key is None:
-                            print(
-                                f"Timeout while requesting key for packet {packet_count + 1}")
-                            break
-                        key_file.write(master_key.hex() + "\n")
-
                     send_packet = data[i: i + self.packet_size]
                     if len(send_packet) < self.packet_size:
                         send_packet = send_packet.ljust(
@@ -262,13 +254,11 @@ if __name__ == "__main__":
         transfer_txt = FileTransfer(send_path='tester.txt',
                                     receive_path='tester_out.txt',
                                     serial_port='COM4',
-                                    key_log_path='keys.txt',
                                     timing_log_path='timings.txt')
         transfer_txt.file_exchange()
     else:  # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                     receive_path='tester_out.jpg',
                                     serial_port='COM4',
-                                    key_log_path='keys.txt',
                                     timing_log_path='timings.txt')
         transfer_jpg.file_exchange()
