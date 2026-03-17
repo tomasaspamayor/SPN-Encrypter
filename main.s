@@ -1,7 +1,7 @@
 #include <xc.inc>
 
 global  pkg_buffer, current_key, encryption_timer, decryption_timer
-extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Timers
+extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Timers, UART_Send_Round_Keys
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
@@ -147,5 +147,6 @@ Clear_Loop:
 
         call    UART_Send_Package
         call    UART_Send_Timers
+        call    UART_Send_Round_Keys
 
         bra     Loop

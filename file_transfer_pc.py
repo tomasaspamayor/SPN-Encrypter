@@ -26,10 +26,13 @@ class FileTransfer():
         packet_size (int): Size of each packet in bytes. Default is 16 bytes (128 bits).
         key_log_path (str): Optional path to log one 16-byte master key per packet.
         timing_log_path (str): Optional path to write per-packet timing data as CSV.
+        round_keys_log_path (str): Optional path to append 176-byte round-key dumps.
+        round_keys_size (int): Size in bytes of the round-key payload sent by firmware.
     """
 
     def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16,
-                 key_log_path=None, timing_log_path=None):
+                 key_log_path=None, timing_log_path=None, round_keys_log_path=None,
+                 round_keys_size=176):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
@@ -37,6 +40,8 @@ class FileTransfer():
         self.packet_size = packet_size
         self.key_log_path = key_log_path
         self.timing_log_path = timing_log_path
+        self.round_keys_log_path = round_keys_log_path
+        self.round_keys_size = round_keys_size
 
     def _uses_hex_text_format(self, path):
         """
@@ -144,6 +149,11 @@ class FileTransfer():
                                        "w", encoding="utf-8")
                     timing_file.write("packet,encrypt_us,decrypt_us\n")
 
+                round_keys_file = None
+                if self.round_keys_log_path:
+                    # Append mode preserves all historical round-key dumps.
+                    round_keys_file = open(self.round_keys_log_path, "a", encoding="utf-8")
+
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i: i + self.packet_size]
                     if len(send_packet) < self.packet_size:
@@ -159,10 +169,11 @@ class FileTransfer():
                             "(additional packets will not be printed to avoid console overflow)")
                     ser.write(send_packet)
 
-                    # Read raw bytes from hardware: 16 data bytes + 4 timer bytes
-                    recv_total = ser.read(self.packet_size + 4)
+                    # Read raw bytes from hardware: 16 data + 4 timer bytes + 176 round-key bytes
+                    recv_total_len = self.packet_size + 4 + self.round_keys_size
+                    recv_total = ser.read(recv_total_len)
 
-                    if len(recv_total) < self.packet_size + 4:
+                    if len(recv_total) < recv_total_len:
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
@@ -171,6 +182,7 @@ class FileTransfer():
                         recv_total[self.packet_size:self.packet_size + 2], 'little')
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
+                    round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
                     # 1 tick = 62.5 ns at Fcy=16 MHz with 1:1 TMR1 prescale
                     enc_us = enc_ticks * 0.0625
                     dec_us = dec_ticks * 0.0625
@@ -180,6 +192,9 @@ class FileTransfer():
                     if timing_file:
                         timing_file.write(
                             f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f}\n")
+
+                    if round_keys_file:
+                        round_keys_file.write(round_keys.hex() + "\n")
 
                     packet_to_write = recv_packet
                     if not self._uses_hex_text_format(self.receive_path):
@@ -195,6 +210,10 @@ class FileTransfer():
                 if timing_file:
                     timing_file.close()
                     print(f"Timings saved to {self.timing_log_path}")
+
+                if round_keys_file:
+                    round_keys_file.close()
+                    print(f"Round keys appended to {self.round_keys_log_path}")
 
                 if key_file:
                     key_file.close()
@@ -221,12 +240,9 @@ class FileTransfer():
 
     def request_master_key(self):
         """Request the current 16-byte master key from firmware and print it as hex."""
-        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
-
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
-            ser.write(key_request)
             key_bytes = ser.read(self.packet_size)
 
             if len(key_bytes) != self.packet_size:
@@ -254,11 +270,13 @@ if __name__ == "__main__":
         transfer_txt = FileTransfer(send_path='tester.txt',
                                     receive_path='tester_out.txt',
                                     serial_port='COM4',
-                                    timing_log_path='timings.txt')
+                                    timing_log_path='timings.txt',
+                                    round_keys_log_path='round_keys_history.txt')
         transfer_txt.file_exchange()
     else:  # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                     receive_path='tester_out.jpg',
                                     serial_port='COM4',
-                                    timing_log_path='timings.txt')
+                                    timing_log_path='timings.txt',
+                                    round_keys_log_path='round_keys_history.txt')
         transfer_jpg.file_exchange()
