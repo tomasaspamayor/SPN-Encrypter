@@ -5,6 +5,7 @@ extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Round_Key
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
+extrn   EEPROM_Read_Buffer
 
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -31,6 +32,13 @@ Setup:
         ; generate keys and start scheduling
 
 Encrypt:
+        ; generate key for use
+        btfsc	key_generated, 0, A	; check if a key has already been generated, if not skip next line
+	bra	Process_Packet
+	
+	call	Key_Setup
+	bsf	key_generated, 0, A
+
         movlw  9                  ; Number of encryption cycles
         movwf  n_cycles, A         ; Store in cycle counter variable
 	
@@ -62,6 +70,7 @@ Encrypt:
 
 
 Decrypt: 
+        call    EEPROM_Read_Buffer  ; load current key in EEPROM
         movlw   9                   ; Number of decryption cycles
         movwf   n_cycles, A          ; Store in cycle counter variable
 
@@ -102,12 +111,6 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
-	
-	btfsc	key_generated, 0, A	; check if a key has already been generated, if not skip next line
-	bra	Process_Packet
-	
-	call	Key_Setup
-	bsf	key_generated, 0, A
 	
 Process_Packet:
 	call	Encrypt 

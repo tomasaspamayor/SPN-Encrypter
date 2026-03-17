@@ -5,7 +5,7 @@ global	Key_Setup, Mix_Key, Key_Buffer, Round_Keys
 extrn	pkg_buffer, current_key  ; the storage location of the package buffer
 extrn	Key_Schedule
 extrn	Generate_Master_Key
-extrn	EEPROM_Write_Buffer, EEPROM_Read_Buffer
+extrn	EEPROM_Write_Buffer
     
 psect	udata_acs   ; reserve data space in access ram
 ; varaibles
