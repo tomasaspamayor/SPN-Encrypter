@@ -42,14 +42,24 @@ Setup:
         ; generate keys and start scheduling
 
 Encrypt:
-        ; generate key for use
-        btfsc	key_generated, 0, A	; check if a key has already been generated, if not skip next line
-	bra	Continue_Encryption
-	
-	call	Key_Setup
-	bsf	key_generated, 0, A
+        ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
+        movlw   0x02
+        cpfseq  pkg_buffer, A
+        bra     No_Key_Gen
 
-Continue_Encryption:
+        ; check if a key has already been generated for this package
+        movlw   0x00
+        cpfseq  key_generated, A
+        BRA     No_Key_Gen
+
+        ; now generate the key and set the flag if start byte detected and no key generated yet
+        movlw   0x01
+        movwf   key_generated, A ; set key generated flag to 1
+        call    Key_Setup
+
+No_Key_Gen:
+        call   EEPROM_Read_Buffer  ; load current key in EEPROM
+
         movlw  9                  ; Number of encryption cycles
         movwf  n_cycles, A         ; Store in cycle counter variable
 	
@@ -122,9 +132,16 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
+        
 
-        ; either encryopt or decrypt the package based on some condition 
+        ; if end of package contains 0x04, reset key generated flag to 0 for next package
+        movlw   0x04
+        cpfseq  pkg_buffer+15, A
+        bra     No_Key_Reset
+        movlw   0x00
+        movwf   key_generated, A
 
+No_Key_Reset:
         clrf    TMR1H, A
         clrf    TMR1L, A
         movlw   0b10000001          ; RD16=1, 1:1 prescale, TMR1ON=1 — start timer
