@@ -8,6 +8,10 @@ import os
 import serial
 
 
+SOF_BYTE = 0x7E
+KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
+
+
 class FileTransfer():
     """
     A class to handle file exchange between a PC and a PIC18 microprocessor over a serial
@@ -28,11 +32,12 @@ class FileTransfer():
         timing_log_path (str): Optional path to write per-packet timing data as CSV.
         round_keys_log_path (str): Optional path to append 176-byte round-key dumps.
         round_keys_size (int): Size in bytes of the round-key payload sent by firmware.
+        use_framing (bool): If True, exchange uses SOF + payload + checksum framing.
     """
 
     def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16,
                  key_log_path=None, timing_log_path=None, round_keys_log_path=None,
-                 round_keys_size=176):
+                 round_keys_size=176, use_framing=True):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
@@ -42,6 +47,52 @@ class FileTransfer():
         self.timing_log_path = timing_log_path
         self.round_keys_log_path = round_keys_log_path
         self.round_keys_size = round_keys_size
+        self.use_framing = use_framing
+
+    def _checksum8(self, data):
+        """Compute compact 8-bit additive checksum (sum modulo 256)."""
+        return sum(data) & 0xFF
+
+    def _build_frame(self, payload):
+        """Build frame as SOF + payload + 8-bit additive checksum."""
+        checksum = self._checksum8(payload)
+        return bytes([SOF_BYTE]) + payload + bytes([checksum])
+
+    def _read_exact(self, ser, size):
+        """Read exactly 'size' bytes from serial or return what was available."""
+        data = bytearray()
+        while len(data) < size:
+            chunk = ser.read(size - len(data))
+            if not chunk:
+                break
+            data.extend(chunk)
+        return bytes(data)
+
+    def _read_payload(self, ser, payload_len):
+        """Read and validate a payload from serial according to framing mode."""
+        if not self.use_framing:
+            return self._read_exact(ser, payload_len)
+
+        # Resynchronize on SOF so stale/shifted bytes don't corrupt all subsequent frames.
+        while True:
+            sof = self._read_exact(ser, 1)
+            if len(sof) != 1:
+                return None
+            if sof[0] == SOF_BYTE:
+                break
+
+        body = self._read_exact(ser, payload_len + 1)  # payload + checksum
+        if len(body) != payload_len + 1:
+            return None
+
+        payload = body[:payload_len]
+        recv_checksum = body[-1]
+        calc_checksum = self._checksum8(payload)
+        if recv_checksum != calc_checksum:
+            print(f"Frame error: checksum mismatch recv=0x{recv_checksum:02X}, calc=0x{calc_checksum:02X}")
+            return None
+
+        return payload
 
     def _uses_hex_text_format(self, path):
         """
@@ -83,15 +134,6 @@ class FileTransfer():
             return
 
         file_obj.write(packet)
-
-    def _request_master_key_over_serial(self, ser):
-        """Request the current 16-byte master key using an open serial link."""
-        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
-        ser.write(key_request)
-        key_bytes = ser.read(self.packet_size)
-        if len(key_bytes) != self.packet_size:
-            return None
-        return key_bytes
 
     def file_exchange(self):
         """
@@ -167,13 +209,15 @@ class FileTransfer():
                     if packet_count == 10:
                         print(
                             "(additional packets will not be printed to avoid console overflow)")
-                    ser.write(send_packet)
+                    tx_payload = send_packet
+                    tx_bytes = self._build_frame(tx_payload) if self.use_framing else tx_payload
+                    ser.write(tx_bytes)
 
-                    # Read raw bytes from hardware: 16 data + 4 timer bytes + 176 round-key bytes
+                    # Read payload from hardware: 16 data + 4 timer bytes + 176 round-key bytes
                     recv_total_len = self.packet_size + 4 + self.round_keys_size
-                    recv_total = ser.read(recv_total_len)
+                    recv_total = self._read_payload(ser, recv_total_len)
 
-                    if len(recv_total) < recv_total_len:
+                    if recv_total is None or len(recv_total) < recv_total_len:
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
@@ -243,9 +287,11 @@ class FileTransfer():
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
-            key_bytes = ser.read(self.packet_size)
+            request_bytes = self._build_frame(KEY_REQUEST_PAYLOAD) if self.use_framing else KEY_REQUEST_PAYLOAD
+            ser.write(request_bytes)
+            key_bytes = self._read_payload(ser, self.packet_size)
 
-            if len(key_bytes) != self.packet_size:
+            if key_bytes is None or len(key_bytes) != self.packet_size:
                 print("Error: did not receive full 16-byte key response.")
                 return None
 
