@@ -137,6 +137,8 @@ UART_Send_Timers:
     lfsr    2, encryption_timer
     movlw   4
     call    UART_Transmit_Message_With_Checksum
+    movf    tx_checksum, W, A
+    call    UART_Transmit_Byte
     return
 
 UART_Transmit_Message_With_Checksum:

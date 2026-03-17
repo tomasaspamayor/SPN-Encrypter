@@ -124,27 +124,29 @@ Clear_Loop:
 
         call    UART_Receive_Package
 
-        ; either encryopt or decrypt the package based on some condition 
+	clrf    TMR1H, A            ; Clear BEFORE starting
+	clrf    TMR1L, A
+	movlw   0b10000001          ; Start Timer (TMR1ON=1)
+	movwf   T1CON, A
+	call    Encrypt
+	movlw   0b10000000          ; Stop Timer (TMR1ON=0)
+	movwf   T1CON, A
+	movf    TMR1L, W, A         ; Read Low (Latches High)
+	movwf   encryption_timer, A
+	movf    TMR1H, W, A         ; Read High from buffer
+	movwf   encryption_timer+1, A
 
-        clrf    TMR1H, A
-        clrf    TMR1L, A
-        movlw   0b10000001          ; RD16=1, 1:1 prescale, TMR1ON=1 — start timer
-        movwf   T1CON, A
-        call    Encrypt
-        movlw   0b10000000          ; TMR1ON=0 — stop timer
-        movwf   T1CON, A
-        movff   TMR1L, encryption_timer
-        movff   TMR1H, encryption_timer+1  ; 16-bit timer value captured
-
-        clrf    TMR1H, A
-        clrf    TMR1L, A
-        movlw   0b10000001          ; RD16=1, 1:1 prescale, TMR1ON=1 — start timer
-        movwf   T1CON, A
-        call    Decrypt
-        movlw   0b10000000          ; TMR1ON=0 — stop timer
-        movwf   T1CON, A
-        movff   TMR1L, decryption_timer
-        movff   TMR1H, decryption_timer+1  ; 16-bit timer value captured
+	clrf    TMR1H, A
+	clrf    TMR1L, A
+	movlw   0b10000001          ; Start Timer (TMR1ON=1)
+	movwf   T1CON, A
+	call    Decrypt
+	movlw   0b10000000          ; Stop Timer (TMR1ON=0)
+	movwf   T1CON, A
+	movf    TMR1L, W, A         ; Read Low (Latches High)
+	movwf   decryption_timer, A
+	movf    TMR1H, W, A
+	movwf   decryption_timer+1, A
 
         call    UART_Send_Package
         call    UART_Send_Timers
