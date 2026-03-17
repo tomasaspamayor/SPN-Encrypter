@@ -83,7 +83,7 @@ UART_Send_Package:
 
 UART_Send_Round_Keys:
     lfsr    2, Round_Keys
-    movlw   16
+    movlw   176
     call    UART_Transmit_Message
     return
 
