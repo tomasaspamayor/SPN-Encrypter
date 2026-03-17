@@ -28,7 +28,7 @@ Setup:
 	movwf   T0CON, A
 	
 	movlw	0x00
-	movwf	key_generated, A
+	movwf	key_generated, A ; initialise key generated flag to 0
 	
 
         ; Configure TMR1: internal clock (Fosc/4), 1:8 prescale, 16-bit r/w, OFF initially
