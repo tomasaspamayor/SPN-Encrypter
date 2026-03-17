@@ -47,6 +47,8 @@ Encrypt:
         cpfseq  pkg_buffer, A
         bra     No_Key_Gen
 
+        ; if using additional SOT bytes, check here
+
         ; check if a key has already been generated for this package
         movlw   0x00
         cpfseq  key_generated, A
@@ -134,12 +136,14 @@ Clear_Loop:
         call    UART_Receive_Package
         
 
-        ; if end of package contains 0x04, reset key generated flag to 0 for next package
+        ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
         movlw   0x04
         cpfseq  pkg_buffer+15, A
         bra     No_Key_Reset
         movlw   0x00
         movwf   key_generated, A
+
+        ; if using additional EOT bytes, check here
 
 No_Key_Reset:
         clrf    TMR1H, A
