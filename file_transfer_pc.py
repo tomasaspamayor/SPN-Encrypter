@@ -23,13 +23,15 @@ class FileTransfer():
         serial_port (str): Serial port to use for communication (e.g., 'COM4' or '/dev/ttyUSB0').
         baud_rate (int): Baud rate for serial communication. Default is 9600.
         packet_size (int): Size of each packet in bytes. Default is 16 bytes (128 bits).
+        timing_log_path (str): Optional path to write per-packet timing data as CSV.
     """
-    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16):
+    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16, timing_log_path=None):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.packet_size = packet_size
+        self.timing_log_path = timing_log_path
 
     def _uses_hex_text_format(self, path):
         """
@@ -116,6 +118,11 @@ class FileTransfer():
                 packet_count = 0
                 bytes_written = 0
 
+                timing_file = None
+                if self.timing_log_path:
+                    timing_file = open(self.timing_log_path, "w", encoding="utf-8")
+                    timing_file.write("packet,encrypt_us,decrypt_us\n")
+
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i : i + self.packet_size]
                     if len(send_packet) < self.packet_size:
@@ -128,14 +135,22 @@ class FileTransfer():
                         print("(additional packets will not be printed to avoid console overflow)")
                     ser.write(send_packet)
 
-                    # Read raw bytes from hardware
-                    recv_packet = ser.read(self.packet_size)
+                    # Read raw bytes from hardware: 16 data bytes + 4 timer bytes
+                    recv_total = ser.read(self.packet_size + 4)
 
-                    if len(recv_packet) < self.packet_size:
+                    if len(recv_total) < self.packet_size + 4:
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
-                    #print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
+                    recv_packet = recv_total[:self.packet_size]
+                    enc_ticks = int.from_bytes(recv_total[self.packet_size:self.packet_size + 2], 'little')
+                    dec_ticks = int.from_bytes(recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
+                    enc_us = enc_ticks * 0.5
+                    dec_us = dec_ticks * 0.5
+                    print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.1f} \u00b5s, decrypt: {dec_us:.1f} \u00b5s")
+                    if timing_file:
+                        timing_file.write(f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f}\n")
+
                     packet_to_write = recv_packet
                     if not self._uses_hex_text_format(self.receive_path):
                         remaining_bytes = len(data) - bytes_written
@@ -146,6 +161,10 @@ class FileTransfer():
 
                     packet_count += 1
                     #print(f"Exchanged packet {packet_count}")
+
+                if timing_file:
+                    timing_file.close()
+                    print(f"Timings saved to {self.timing_log_path}")
 
                 print(f"Exchange complete. {packet_count} packets processed.")
 
@@ -173,10 +192,12 @@ if __name__ == "__main__":
     if file_type == 0:  # Example usage: .TXT file.
         transfer_txt = FileTransfer(send_path='tester.txt',
                                 receive_path='tester_out.txt',
-                                serial_port='COM4')
+                                serial_port='COM4',
+                                timing_log_path='timings.txt')
         transfer_txt.file_exchange()
     else: # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                 receive_path='tester_out.jpg',
-                                serial_port='COM4')
+                                serial_port='COM4',
+                                timing_log_path='timings.txt')
         transfer_jpg.file_exchange()

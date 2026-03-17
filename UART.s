@@ -1,7 +1,7 @@
 #include <xc.inc>
 
-global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package
-extrn   pkg_buffer
+global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package, UART_Send_Timers
+extrn   pkg_buffer, encryption_timer, decryption_timer
 
 psect	udata_acs   ; reserve data space in access ram
 UART_counter: ds    1	    ; reserve 1 byte for variable UART_counter
@@ -78,5 +78,12 @@ Handle_Framing:
 UART_Send_Package:
     lfsr    2, pkg_buffer   
     movlw   16
+    call    UART_Transmit_Message
+    return
+
+UART_Send_Timers:
+    ; Sends 4 bytes: enc_timer_low, enc_timer_high, dec_timer_low, dec_timer_high
+    lfsr    2, encryption_timer
+    movlw   4
     call    UART_Transmit_Message
     return
