@@ -1,6 +1,6 @@
 """
 The script to collect and analyse the project data.
-It will constitute mainly the calculations of:
+It will constitute mainly the calculations and plottings of:
 
 a) Encryption and Decryption checks.
 b) The Strict Avalanche Criterion (SAC) by the Hamming distance.
@@ -174,5 +174,37 @@ def plot_bigo_complexity(times_list):
     plt.title('Time Taken vs Input Size (Log-Log Scale)')
     plt.xlabel('Input Size (log scale)')
     plt.ylabel('Time Taken (log scale)')
+    plt.legend()
+    plt.show()
+
+def calculate_process_rates(data_sizes_list, times_list):
+    """
+    Calculate the process rates in MB/s based on the data sizes and time taken.
+    We can then plot these rates against input sizes to visualize performance.
+    """
+    if type(data_sizes_list) != list or type(times_list) != list:
+        raise ValueError("Both inputs must be lists")
+    if len(data_sizes_list) == 0 or len(times_list) == 0:
+        raise ValueError("Input lists cannot be empty")
+    rates = [data_size / time for data_size, time in zip(data_sizes_list, times_list)]
+    return rates
+
+def plot_process_rates(data_sizes_list, rates_list):
+    """
+    Plot the process rates in MB/s against input sizes to visualize performance.
+    We should also include a line representing the average rate.
+    """
+    if type(data_sizes_list) != list or type(rates_list) != list:
+        raise ValueError("Both inputs must be lists")
+    if len(data_sizes_list) == 0 or len(rates_list) == 0:
+        raise ValueError("Input lists cannot be empty")
+    plt.figure(figsize=(12, 6))
+    plt.scatter(data_sizes_list, rates_list, alpha=0.5, label='Measured Rates')
+    average_rate = np.mean(rates_list)
+    plt.axhline(y=average_rate, color='r', linestyle='--', label=f'Average Rate: {average_rate:.2f} MB/s')
+    plt.xscale('log')
+    plt.title('Process Rates vs Input Size')
+    plt.xlabel('Input Size (MB)')
+    plt.ylabel('Process Rate (MB/s)')
     plt.legend()
     plt.show()
