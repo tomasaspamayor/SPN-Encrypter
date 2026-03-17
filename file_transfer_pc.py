@@ -7,6 +7,7 @@ from the PIC before sending the next one.
 import os
 import serial
 
+
 class FileTransfer():
     """
     A class to handle file exchange between a PC and a PIC18 microprocessor over a serial
@@ -23,29 +24,22 @@ class FileTransfer():
         serial_port (str): Serial port to use for communication (e.g., 'COM4' or '/dev/ttyUSB0').
         baud_rate (int): Baud rate for serial communication. Default is 9600.
         packet_size (int): Size of each packet in bytes. Default is 16 bytes (128 bits).
+        timing_log_path (str): Optional path to write per-packet timing data as CSV.
     """
-    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16, key_log_path=None):
+
+    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16, timing_log_path=None):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.packet_size = packet_size
-        self.key_log_path = key_log_path
-
-    def _request_master_key_over_serial(self, ser):
-        """Request the current 16-byte master key over an existing serial session."""
-        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
-        ser.write(key_request)
-        key_bytes = ser.read(self.packet_size)
-        if len(key_bytes) != self.packet_size:
-            return None
-        return key_bytes
+        self.timing_log_path = timing_log_path
 
     def _uses_hex_text_format(self, path):
         """
         Determines if the file at the given path should be treated as a hexadecimal text dump
         based on its extension.
-        
+
         Args:
             path (str): The file path to check.
         Returns:
@@ -112,51 +106,73 @@ class FileTransfer():
             print("Error: Input file contains invalid hex characters.")
             return
 
-        input_mode = "hex-text" if self._uses_hex_text_format(self.send_path) else "binary"
+        input_mode = "hex-text" if self._uses_hex_text_format(
+            self.send_path) else "binary"
         print(f"Read {len(data)} bytes from {input_mode} input file.")
 
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=200)
 
-            output_mode = 'w' if self._uses_hex_text_format(self.receive_path) else 'wb'
+            output_mode = 'w' if self._uses_hex_text_format(
+                self.receive_path) else 'wb'
             output_kwargs = {"encoding": "utf-8"} if output_mode == 'w' else {}
 
             with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
                 bytes_written = 0
 
-                key_file = None
-                if self.key_log_path:
-                    key_file = open(self.key_log_path, "w", encoding="utf-8")
+                timing_file = None
+                if self.timing_log_path:
+                    timing_file = open(self.timing_log_path,
+                                       "w", encoding="utf-8")
+                    timing_file.write("packet,encrypt_us,decrypt_us\n")
 
                 for i in range(0, len(data), self.packet_size):
                     if key_file:
                         master_key = self._request_master_key_over_serial(ser)
                         if master_key is None:
-                            print(f"Timeout while requesting key for packet {packet_count + 1}")
+                            print(
+                                f"Timeout while requesting key for packet {packet_count + 1}")
                             break
                         key_file.write(master_key.hex() + "\n")
 
-                    send_packet = data[i : i + self.packet_size]
+                    send_packet = data[i: i + self.packet_size]
                     if len(send_packet) < self.packet_size:
-                        send_packet = send_packet.ljust(self.packet_size, b'\x00')
+                        send_packet = send_packet.ljust(
+                            self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
                     if packet_count < 10:
-                        print(f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
+                        print(
+                            f"Sending packet to PIC {packet_count + 1}: {send_packet.hex()}")
                     if packet_count == 10:
-                        print("(additional packets will not be printed to avoid console overflow)")
+                        print(
+                            "(additional packets will not be printed to avoid console overflow)")
                     ser.write(send_packet)
 
-                    # Read raw bytes from hardware
-                    recv_packet = ser.read(self.packet_size)
+                    # Read raw bytes from hardware: 16 data bytes + 4 timer bytes
+                    recv_total = ser.read(self.packet_size + 4)
 
-                    if len(recv_packet) < self.packet_size:
+                    if len(recv_total) < self.packet_size + 4:
                         print(f"Timeout at packet {packet_count + 1}")
                         break
 
-                    #print(f"Received packet from PIC {packet_count + 1}: {recv_packet.hex()}")
+                    recv_packet = recv_total[:self.packet_size]
+                    enc_ticks = int.from_bytes(
+                        recv_total[self.packet_size:self.packet_size + 2], 'little')
+                    dec_ticks = int.from_bytes(
+                        recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
+                    # 1 tick = 62.5 ns at Fcy=16 MHz with 1:1 TMR1 prescale
+                    enc_us = enc_ticks * 0.0625
+                    dec_us = dec_ticks * 0.0625
+                    print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
+                          f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks) "
+                          f"[raw: {recv_total[self.packet_size:self.packet_size+4].hex()}]")
+                    if timing_file:
+                        timing_file.write(
+                            f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f}\n")
+
                     packet_to_write = recv_packet
                     if not self._uses_hex_text_format(self.receive_path):
                         remaining_bytes = len(data) - bytes_written
@@ -166,11 +182,11 @@ class FileTransfer():
                     bytes_written += len(packet_to_write)
 
                     packet_count += 1
-                    #print(f"Exchanged packet {packet_count}")
+                    # print(f"Exchanged packet {packet_count}")
 
-                if key_file:
-                    key_file.close()
-                    print(f"Master keys saved to {self.key_log_path}")
+                if timing_file:
+                    timing_file.close()
+                    print(f"Timings saved to {self.timing_log_path}")
 
                 print(f"Exchange complete. {packet_count} packets processed.")
 
@@ -217,19 +233,20 @@ class FileTransfer():
                 ser.close()
                 print("Serial port safely closed.")
 
+
 if __name__ == "__main__":
 
     file_type = 0
 
     if file_type == 0:  # Example usage: .TXT file.
         transfer_txt = FileTransfer(send_path='tester.txt',
-                                receive_path='tester_out.txt',
-                                serial_port='COM4',
-                                key_log_path='keys.txt')
+                                    receive_path='tester_out.txt',
+                                    serial_port='COM4',
+                                    timing_log_path='timings.txt')
         transfer_txt.file_exchange()
-    else: # Example usage: .JPG file.
+    else:  # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
-                                receive_path='tester_out.jpg',
-                                serial_port='COM4',
-                                key_log_path='keys.txt')
+                                    receive_path='tester_out.jpg',
+                                    serial_port='COM4',
+                                    timing_log_path='timings.txt')
         transfer_jpg.file_exchange()
