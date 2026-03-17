@@ -24,15 +24,18 @@ class FileTransfer():
         serial_port (str): Serial port to use for communication (e.g., 'COM4' or '/dev/ttyUSB0').
         baud_rate (int): Baud rate for serial communication. Default is 9600.
         packet_size (int): Size of each packet in bytes. Default is 16 bytes (128 bits).
+        key_log_path (str): Optional path to log one 16-byte master key per packet.
         timing_log_path (str): Optional path to write per-packet timing data as CSV.
     """
 
-    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16, timing_log_path=None):
+    def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16,
+                 key_log_path=None, timing_log_path=None):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
         self.baud_rate = baud_rate
         self.packet_size = packet_size
+        self.key_log_path = key_log_path
         self.timing_log_path = timing_log_path
 
     def _uses_hex_text_format(self, path):
@@ -75,6 +78,15 @@ class FileTransfer():
             return
 
         file_obj.write(packet)
+
+    def _request_master_key_over_serial(self, ser):
+        """Request the current 16-byte master key using an open serial link."""
+        key_request = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
+        ser.write(key_request)
+        key_bytes = ser.read(self.packet_size)
+        if len(key_bytes) != self.packet_size:
+            return None
+        return key_bytes
 
     def file_exchange(self):
         """
@@ -121,6 +133,10 @@ class FileTransfer():
             with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
                 bytes_written = 0
+
+                key_file = None
+                if self.key_log_path:
+                    key_file = open(self.key_log_path, "w", encoding="utf-8")
 
                 timing_file = None
                 if self.timing_log_path:
@@ -188,6 +204,10 @@ class FileTransfer():
                     timing_file.close()
                     print(f"Timings saved to {self.timing_log_path}")
 
+                if key_file:
+                    key_file.close()
+                    print(f"Keys saved to {self.key_log_path}")
+
                 print(f"Exchange complete. {packet_count} packets processed.")
 
         except serial.SerialException as e:
@@ -242,11 +262,13 @@ if __name__ == "__main__":
         transfer_txt = FileTransfer(send_path='tester.txt',
                                     receive_path='tester_out.txt',
                                     serial_port='COM4',
+                                    key_log_path='keys.txt',
                                     timing_log_path='timings.txt')
         transfer_txt.file_exchange()
     else:  # Example usage: .JPG file.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                     receive_path='tester_out.jpg',
                                     serial_port='COM4',
+                                    key_log_path='keys.txt',
                                     timing_log_path='timings.txt')
         transfer_jpg.file_exchange()
