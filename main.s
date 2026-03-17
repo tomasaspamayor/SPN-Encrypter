@@ -44,11 +44,12 @@ Setup:
 Encrypt:
         ; generate key for use
         btfsc	key_generated, 0, A	; check if a key has already been generated, if not skip next line
-	bra	Process_Packet
+	bra	Continue_Encryption
 	
 	call	Key_Setup
 	bsf	key_generated, 0, A
 
+Continue_Encryption:
         movlw  9                  ; Number of encryption cycles
         movwf  n_cycles, A         ; Store in cycle counter variable
 	
