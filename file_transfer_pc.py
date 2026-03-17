@@ -8,7 +8,8 @@ import os
 import serial
 
 
-SOF_BYTE = 0x7E
+SOT_BYTE = 0x02
+EOT_BYTE = 0x04
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
 
@@ -32,7 +33,7 @@ class FileTransfer():
         timing_log_path (str): Optional path to write per-packet timing data as CSV.
         round_keys_log_path (str): Optional path to append 176-byte round-key dumps.
         round_keys_size (int): Size in bytes of the round-key payload sent by firmware.
-        use_framing (bool): If True, exchange uses SOF + payload + checksum framing.
+        use_framing (bool): If True, exchange uses SOT + (packet+checksum)*N + EOT.
     """
 
     def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16,
@@ -53,10 +54,10 @@ class FileTransfer():
         """Compute compact 8-bit additive checksum (sum modulo 256)."""
         return sum(data) & 0xFF
 
-    def _build_frame(self, payload):
-        """Build frame as SOF + payload + 8-bit additive checksum."""
+    def _build_packet_with_checksum(self, payload):
+        """Build one packet unit as payload + 8-bit additive checksum."""
         checksum = self._checksum8(payload)
-        return bytes([SOF_BYTE]) + payload + bytes([checksum])
+        return payload + bytes([checksum])
 
     def _read_exact(self, ser, size):
         """Read exactly 'size' bytes from serial or return what was available."""
@@ -68,20 +69,12 @@ class FileTransfer():
             data.extend(chunk)
         return bytes(data)
 
-    def _read_payload(self, ser, payload_len):
-        """Read and validate a payload from serial according to framing mode."""
+    def _read_packet_payload(self, ser, payload_len):
+        """Read one packet payload and validate trailing checksum."""
         if not self.use_framing:
             return self._read_exact(ser, payload_len)
 
-        # Resynchronize on SOF so stale/shifted bytes don't corrupt all subsequent frames.
-        while True:
-            sof = self._read_exact(ser, 1)
-            if len(sof) != 1:
-                return None
-            if sof[0] == SOF_BYTE:
-                break
-
-        body = self._read_exact(ser, payload_len + 1)  # payload + checksum
+        body = self._read_exact(ser, payload_len + 1)
         if len(body) != payload_len + 1:
             return None
 
@@ -93,6 +86,26 @@ class FileTransfer():
             return None
 
         return payload
+
+    def _send_sot(self, ser):
+        if self.use_framing:
+            ser.write(bytes([SOT_BYTE]))
+
+    def _send_eot(self, ser):
+        if self.use_framing:
+            ser.write(bytes([EOT_BYTE]))
+
+    def _expect_sot(self, ser):
+        if not self.use_framing:
+            return True
+        marker = self._read_exact(ser, 1)
+        return len(marker) == 1 and marker[0] == SOT_BYTE
+
+    def _expect_eot(self, ser):
+        if not self.use_framing:
+            return True
+        marker = self._read_exact(ser, 1)
+        return len(marker) == 1 and marker[0] == EOT_BYTE
 
     def _uses_hex_text_format(self, path):
         """
@@ -196,6 +209,12 @@ class FileTransfer():
                     # Append mode preserves all historical round-key dumps.
                     round_keys_file = open(self.round_keys_log_path, "a", encoding="utf-8")
 
+                if self.use_framing:
+                    self._send_sot(ser)
+                    if not self._expect_sot(ser):
+                        print("Frame error: did not receive SOT from device.")
+                        return
+
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i: i + self.packet_size]
                     if len(send_packet) < self.packet_size:
@@ -210,12 +229,12 @@ class FileTransfer():
                         print(
                             "(additional packets will not be printed to avoid console overflow)")
                     tx_payload = send_packet
-                    tx_bytes = self._build_frame(tx_payload) if self.use_framing else tx_payload
+                    tx_bytes = self._build_packet_with_checksum(tx_payload) if self.use_framing else tx_payload
                     ser.write(tx_bytes)
 
                     # Read payload from hardware: 16 data + 4 timer bytes + 176 round-key bytes
                     recv_total_len = self.packet_size + 4 + self.round_keys_size
-                    recv_total = self._read_payload(ser, recv_total_len)
+                    recv_total = self._read_packet_payload(ser, recv_total_len)
 
                     if recv_total is None or len(recv_total) < recv_total_len:
                         print(f"Timeout at packet {packet_count + 1}")
@@ -227,7 +246,6 @@ class FileTransfer():
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
                     round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
-                    # 1 tick = 62.5 ns at Fcy=16 MHz with 1:1 TMR1 prescale
                     enc_us = enc_ticks * 0.0625
                     dec_us = dec_ticks * 0.0625
                     print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
@@ -250,6 +268,12 @@ class FileTransfer():
 
                     packet_count += 1
                     # print(f"Exchanged packet {packet_count}")
+
+                if self.use_framing:
+                    self._send_eot(ser)
+                    if not self._expect_eot(ser):
+                        print("Frame error: did not receive EOT from device.")
+                        return
 
                 if timing_file:
                     timing_file.close()
@@ -287,9 +311,21 @@ class FileTransfer():
         ser = None
         try:
             ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
-            request_bytes = self._build_frame(KEY_REQUEST_PAYLOAD) if self.use_framing else KEY_REQUEST_PAYLOAD
+            if self.use_framing:
+                self._send_sot(ser)
+                if not self._expect_sot(ser):
+                    print("Frame error: did not receive SOT from device.")
+                    return None
+
+            request_bytes = self._build_packet_with_checksum(KEY_REQUEST_PAYLOAD) if self.use_framing else KEY_REQUEST_PAYLOAD
             ser.write(request_bytes)
-            key_bytes = self._read_payload(ser, self.packet_size)
+            key_bytes = self._read_packet_payload(ser, self.packet_size)
+
+            if self.use_framing:
+                self._send_eot(ser)
+                if not self._expect_eot(ser):
+                    print("Frame error: did not receive EOT from device.")
+                    return None
 
             if key_bytes is None or len(key_bytes) != self.packet_size:
                 print("Error: did not receive full 16-byte key response.")
