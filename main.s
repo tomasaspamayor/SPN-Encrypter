@@ -1,7 +1,7 @@
 #include <xc.inc>
 
 global  pkg_buffer, current_key
-extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Master_Key
+extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Round_Keys
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Key_Setup, Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
@@ -11,6 +11,7 @@ pkg_buffer:  ds 16
 CLEAR_CNT:   ds 1          ; Counter for clearing buffer
 n_cycles:    ds 1          ; Counter for number of encryption cycles
 current_key: ds 1	   ; Current key (0-10)
+key_generated: ds 1	   ; has a key been generated
 
 ; Reset vector
 psect   reset_vec, class=CODE, reloc=2
@@ -19,7 +20,13 @@ psect   reset_vec, class=CODE, reloc=2
 psect   code
 Setup:
         call    UART_Setup          ; Initialize UART
-        call    Key_Setup	    ; generate key
+	; start timer for key gen
+	movlw   0b11011000      ; T08BIT=1, T0CS=0, PSA=0 (1:2 prescaler)
+	movwf   T0CON, A
+	
+	movlw	0x00
+	movwf	key_generated, A
+	
 	bra	Loop
         ; generate keys and start scheduling
 
@@ -95,9 +102,17 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
+	
+	btfsc	key_generated, 0, A	; check if a key has already been generated, if not skip next line
+	bra	Process_Packet
+	
+	call	Key_Setup
+	bsf	key_generated, 0, A
+	
+Process_Packet:
 	call	Encrypt 
 	call	Decrypt 
 	
-        call    UART_Send_Master_Key
+        call    UART_Send_Round_Keys
 	
         bra     Loop
