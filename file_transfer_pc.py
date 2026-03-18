@@ -11,9 +11,8 @@ import time
 
 SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
 FRAME_MARKER_SIZE = len(SOT_MARKER)
-MODE_DECRYPT_BYTE = 0x00
-MODE_ENCRYPT_BYTE = 0x01
-MODE_BOTH_BYTE = 0x02
+MODE_DECRYPT_BYTE = 0x02
+MODE_ENCRYPT_BYTE = 0x02
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
 
@@ -342,7 +341,7 @@ if __name__ == "__main__":
                                     timing_log_path='timings.txt',
                                     round_keys_log_path='round_keys_history.txt',
                                     use_framing=True,
-                                    encryption_mode=True)
+                                    encryption_mode=False)
         transfer_txt.file_exchange()
     else:  # Example usage: .JPG file, encryption mode, with framing and logging.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
