@@ -36,7 +36,7 @@ Copy_ROM_Loop:
 	decfsz  TRNG_counter, F, A
 	bra     Copy_ROM_Loop
 	
-	movff	TMR0H, POSTINC2
-	movff   TMR0L, INDF2
+	movff   TMR0L, POSTINC2 
+	movff   TMR0H, INDF2    
 
 	return

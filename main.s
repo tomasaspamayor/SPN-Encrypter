@@ -3,16 +3,15 @@
 global  pkg_buffer, current_key, encryption_timer, decryption_timer
 extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Timers, UART_Send_Round_Keys
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
-extrn	Key_Setup, Mix_Key
+extrn	Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
-extrn   EEPROM_Read_Buffer
-
+extrn	EEPROM_Read_Buffer
+    
 psect  udata_acs
 pkg_buffer:  ds 16
 CLEAR_CNT:   ds 1          ; Counter for clearing buffer
 n_cycles:    ds 1          ; Counter for number of encryption cycles
 current_key: ds 1	   ; Current key (0-10)
-key_generated: ds 1	   ; has a key been generated
 encryption_timer: ds 2     ; Elapsed TMR1 ticks for encryption
 decryption_timer: ds 2     ; Elapsed TMR1 ticks for decryption
 
@@ -27,9 +26,6 @@ Setup:
 	movlw   0b11011000
 	movwf   T0CON, A
 	
-	movlw	0x00
-	movwf	key_generated, A
-	
 	clrf    T1CON, A        ; Clear register
 	bsf     T1CON, 1, A     ; Set Bit 1 (RD16)
 	clrf    T1GCON, A       ; Disable gate control
@@ -37,26 +33,6 @@ Setup:
 	bra	Loop
 
 Encrypt:
-        ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
-        movlw   0x02
-        cpfseq  pkg_buffer, A
-        bra     No_Key_Gen
-
-        ; if using additional SOT bytes, check here
-
-        ; check if a key has already been generated for this package
-        movlw   0x00
-        cpfseq  key_generated, A
-        BRA     No_Key_Gen
-
-        ; now generate the key and set the flag if start byte detected and no key generated yet
-        movlw   0x01
-        movwf   key_generated, A ; set key generated flag to 1
-        call    Key_Setup
-
-No_Key_Gen:
-        call   EEPROM_Read_Buffer  ; load current key in EEPROM
-
         movlw  9                  ; Number of encryption cycles
         movwf  n_cycles, A         ; Store in cycle counter variable
 	
@@ -129,16 +105,6 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
-         ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
-        movlw   0x04
-        cpfseq  pkg_buffer+15, A
-        bra     No_Key_Reset
-        movlw   0x00
-        movwf   key_generated, A
-
-        ; if using additional EOT bytes, check here
-
-No_Key_Reset:
 
 	    ; --- Encryption timing ---
 	bcf     T1CON, 0, A           ; Ensure TMR1ON = 0 (stop timer)

@@ -2,6 +2,8 @@
 
 global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package, UART_Send_Round_Keys, UART_Send_Timers
 extrn   pkg_buffer, Round_Keys, encryption_timer, decryption_timer
+extrn	Key_Setup
+extrn	EEPROM_Read_Buffer
 
 psect	udata_acs   ; reserve data space in access ram
 UART_counter: ds    1	    ; reserve 1 byte for variable UART_counter
@@ -10,6 +12,7 @@ rx_checksum: ds 1
 tx_checksum: ds 1
 session_active: ds 1
 rx_first_byte: ds 1
+key_generated: ds 1
 
 psect	uart_code,class=CODE
 UART_Setup:
@@ -23,6 +26,7 @@ UART_Setup:
     bsf	    TRISC, PORTC_TX1_POSN, A	; TX1 pin is output on RC6 pin
 					; must set TRISC6 to 1
     clrf    session_active, A
+    clrf    key_generated, A	; key generated flag
     clrf    rx_checksum, A
     clrf    tx_checksum, A
     return
@@ -55,16 +59,33 @@ UART_Receive_Package:
     bsf     RCSTA1, 4, A
 
     btfsc   session_active, 0, A
-    bra     RX_Read_First
+    bra     No_Key_Gen
 
 RX_Wait_SOT:
     call    UART_Receive_Byte
     xorlw   0x02
     bnz     RX_Wait_SOT
+    bsf     session_active, 0, A
+    
+    ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
+    
+    ; double check that no key exists for this transmission using key_generated flag
+    movlw   0x00                   
+    cpfseq  key_generated, A       
+    bra     No_Key_Gen              
+    
+    movlw   0x01
+    movwf   key_generated, A        
+    call    Key_Setup
+    
     movlw   0x02                    ; ACK SOT to host
     call    UART_Transmit_Byte
-    bsf     session_active, 0, A
-
+    
+    bra	    RX_Read_First
+    
+No_Key_Gen:
+    call   EEPROM_Read_Buffer  ; load current key in EEPROM
+    
 RX_Read_First:
     call    UART_Receive_Byte
     movwf   rx_first_byte, A
@@ -103,7 +124,12 @@ RX_Read_Checksum:
 RX_Handle_EOT:
     movlw   0x04                    ; ACK EOT to host
     call    UART_Transmit_Byte
-    bcf     session_active, 0, A
+    bcf     session_active, 0, A    ; reset the session flag
+    
+    ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
+    movlw   0x00
+    movwf   key_generated, A
+    
     bra     UART_Receive_Package
 
 Handle_Overrun:
