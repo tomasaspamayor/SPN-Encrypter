@@ -118,7 +118,7 @@ Clear_Loop:
 	
 	
 Session_Encrypt:
-	call	UART_Recieve_Package
+	call	UART_Receive_Package
 	call	Encrypt 
 	call    UART_Send_Package
         call    UART_Send_Timers
@@ -128,7 +128,7 @@ Session_Encrypt:
 	
     
 Session_Decrypt:
-	call	UART_Recieve_Package
+	call	UART_Receive_Package
 	call	Decrypt 
 	call    UART_Send_Package
         call    UART_Send_Timers

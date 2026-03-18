@@ -19,7 +19,6 @@
                    projectFiles="true">
       <itemPath>config.s</itemPath>
       <itemPath>main.s</itemPath>
-      <itemPath>UART.s</itemPath>
       <itemPath>key-mixing.s</itemPath>
       <itemPath>p_box_enc.s</itemPath>
       <itemPath>sbox.s</itemPath>
@@ -27,6 +26,7 @@
       <itemPath>p_box_dec.s</itemPath>
       <itemPath>eeprom.s</itemPath>
       <itemPath>trng.s</itemPath>
+      <itemPath>UART.s</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>

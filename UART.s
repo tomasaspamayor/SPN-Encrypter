@@ -12,15 +12,17 @@ rx_checksum: ds 1
 tx_checksum: ds 1
 session_active: ds 1
 rx_first_byte: ds 1
-key_generated: ds 1
+match_counter: ds 1
+packets_remaining: ds 2
+session_mode: ds 1
     
 psect   const_data,class=CONST,reloc=2
 SOT_Seq:
-    db      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    db      0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80
 
 psect   const_data,class=CONST,reloc=2
-EOT_SEQ:
-    db      0xFF, 0x66, 0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x04
+EOT_Seq:
+    db      0x80, 0x4F, 0x9B, 0xD2, 0x11, 0x7E, 0xC5, 0x3A
 
 psect	uart_code,class=CODE
 UART_Setup:
@@ -34,7 +36,6 @@ UART_Setup:
     bsf	    TRISC, PORTC_TX1_POSN, A	; TX1 pin is output on RC6 pin
 					; must set TRISC6 to 1
     clrf    session_active, A
-    clrf    key_generated, A	; key generated flag
     clrf    rx_checksum, A
     clrf    tx_checksum, A
     return
@@ -62,12 +63,10 @@ UART_Receive_Byte:
     return
 
 UART_Receive_Package:
-    ; Session framing expected by PC side:
-    ; SOT (0x02), then N * (16-byte payload + 1-byte checksum), then EOT (0x04)
     bsf     RCSTA1, 4, A
 
-    btfsc   session_active, 0, A
-    bra     No_Key_Gen
+    btfsc   session_active, 0, A ; if session is not active
+    bra     RX_Wait_SOT_Init	; wait for an SOT sequence
 
 RX_Wait_SOT_Init:
     movlw   low(SOT_Seq)
@@ -106,6 +105,13 @@ Session_Started:
     call    UART_Receive_Byte       ; get the Instruction Byte 
     movwf   session_mode, A	    ; set the session mode
     
+    call    UART_Receive_Byte	    ; packets remaining setter
+    movwf   packets_remaining, A
+    
+    call    UART_Receive_Byte	    ; read second packets remaining byte
+    movwf   packets_remaining+1, A
+    
+    movf    session_mode, W, A
     xorlw   0x01
     bz	    Encryption_Setup
     
@@ -129,11 +135,6 @@ Decryption_Setup:
 RX_Read_First:
     call    UART_Receive_Byte
     movwf   rx_first_byte, A
-
-    ; If session terminator arrives, ACK and wait for next session.
-    movf    rx_first_byte, W, A
-    xorlw   0x04
-    bz      RX_Handle_EOT
 
     lfsr    2, pkg_buffer
     movlw   16
@@ -159,49 +160,25 @@ RX_Read_Checksum:
     cpfseq  rx_checksum, A          ; compare with computed checksum
     bra     UART_Receive_Package    ; invalid packet: drop and resync
 
-    return
+    movf    packets_remaining, W, A   ; load the low byte 
+    bnz     Decrement_Low             ; if low byte is nonzero, skip the borrow
+    decf    packets_remaining+1, F, A ; if the low byte is zero, borrow the high byte
 
-RX_Wait_EOT_Init:
-    movlw   low(EOT_Seq)
-    movwf   TBLPTRL, A
-    movlw   high(EOT_Seq)
-    movwf   TBLPTRH, A
-    movlw   low(highword(EOT_Seq))
-    movwf   TBLPTRU, A
-    
-    movlw   8
-    movwf   match_counter, A
+Decrement_Low:
+    ; dec the low byte
+    decf    packets_remaining, F, A   
 
-RX_EOT_Loop:
-    call    UART_Receive_Byte     
+    ; check if the entire thing is 0x0000
+    movf    packets_remaining, W, A   ; load low byte W
+    iorwf   packets_remaining+1, W, A ; or the high byte with W
     
-    tblrd* ; read eot byte into tablat
+    bz      Session_Complete          ; if the result is zero, have 0x0000
     
-    cpfseq  TABLAT, A               ; compare received byte with expected byte
-    bra     EOT_Sequence_Failed     ; branch off if no match
+    bra     UART_Receive_Package      ; If not, go to next package
 
-    ; match
-    tblrd*+                         ; goto next expected byte
-    decfsz  match_counter, F, A     ; decrement byte count
-    bra     RX_EOT_Loop             ; if not zero, wait for next
-
-    ; all matches
-    movlw   0x04                    ; ACK the EOT to the host PC
-    call    UART_Transmit_Byte
-    
-    bcf     session_active, 0, A    ; reset the session flag
-    clrf    key_generated, A        ; clear the key flag
-    
-    bra     UART_Receive_Package    ; Go back to the very beginning to wait for a new SOT
-
-EOT_Sequence_Failed:
-    ; any failures, start again
-    bra     RX_Wait_EOT_Init
-    
-    ; if end of package contains EOT marker, reset key generated flag to 0 for next package
-    movlw   0x00
-    movwf   key_generated, A
-    
+Session_Complete:
+    ; all packets recieved
+    bcf     session_active, 0, A      
     bra     UART_Receive_Package
 
 Handle_Overrun:
