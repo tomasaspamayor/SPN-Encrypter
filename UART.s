@@ -1,6 +1,6 @@
 #include <xc.inc>
 
-global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package, UART_Send_Round_Keys, UART_Send_Timers
+global  UART_Setup, UART_Transmit_Message, UART_Receive_Package, UART_Send_Package, UART_Send_Round_Keys, UART_Send_Timers, session_mode
 extrn   pkg_buffer, Round_Keys, encryption_timer, decryption_timer
 extrn	Key_Setup
 extrn	EEPROM_Read_Buffer
@@ -16,11 +16,11 @@ key_generated: ds 1
     
 psect   const_data,class=CONST,reloc=2
 SOT_Seq:
-    db      0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x02
+    db      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 
 psect   const_data,class=CONST,reloc=2
 EOT_SEQ:
-    db      0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x04
+    db      0xFF, 0x66, 0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x04
 
 psect	uart_code,class=CODE
 UART_Setup:
@@ -99,25 +99,32 @@ Sequence_Failed:
     ; if any byte is wrong, start again
     bra     RX_Wait_SOT_Init
 
-Session_Started:    
-    ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
-    
-    ; double check that no key exists for this transmission using key_generated flag
-    movlw   0x00                   
-    cpfseq  key_generated, A       
-    bra     No_Key_Gen              
-    
-    movlw   0x01
-    movwf   key_generated, A        
-    call    Key_Setup
-    
+Session_Started:  
     movlw   0x02                    ; ACK SOT to host
     call    UART_Transmit_Byte
     
+    call    UART_Receive_Byte       ; get the Instruction Byte 
+    movwf   session_mode, A	    ; set the session mode
+    
+    xorlw   0x01
+    bz	    Encryption_Setup
+    
+    movf    session_mode, W, A
+    xorlw   0x00
+    bz	    Decryption_Setup
+    
+    movf    session_mode, W, A ; both encryption and decryption
+    xorlw   0x02
+    bz	    Encryption_Setup
+    
+Encryption_Setup:
+    ; generate key for use if the start of the package is detected  
+    call    Key_Setup
     bra	    RX_Read_First
     
-No_Key_Gen:
+Decryption_Setup:
     call   EEPROM_Read_Buffer  ; load current key in EEPROM
+    bra	   RX_Read_First
     
 RX_Read_First:
     call    UART_Receive_Byte

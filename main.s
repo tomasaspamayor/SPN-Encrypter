@@ -5,7 +5,7 @@ extrn   UART_Setup, UART_Receive_Package, UART_Send_Package, UART_Send_Timers, U
 extrn	SBOX_Encrypt_Byte, SBOX_Encrypt_Buffer, SBOX_Decrypt_Byte, SBOX_Decrypt_Buffer
 extrn	Mix_Key
 extrn   P_Box_Enc, P_Box_Dec, Unshift_Rows, Shift_Rows
-extrn	EEPROM_Read_Buffer
+extrn	session_mode
     
 psect  udata_acs
 pkg_buffer:  ds 16
@@ -64,7 +64,6 @@ Encrypt:
 
 
 Decrypt: 
-        call    EEPROM_Read_Buffer  ; load current key in EEPROM
         movlw   9                   ; Number of decryption cycles
         movwf   n_cycles, A          ; Store in cycle counter variable
 
@@ -103,7 +102,42 @@ Clear_Loop:
         movwf   POSTINC2, A            ; Write W=0 (clear) and increment pointer
         decfsz  CLEAR_CNT, F, A             ; Decrement counter, skip if zero
         bra     Clear_Loop
+	
+	movf	session_mode, W, A
+	xorlw	0x01
+	bz	Session_Encrypt
+	
+	movf	session_mode, W, A
+	xorlw	0x00
+	bz	Session_Decrypt
+	
+	movf	session_mode, W, A
+	xorlw	0x02
+	bz	Session_Mixed
+	
+	
+	
+Session_Encrypt:
+	call	UART_Recieve_Package
+	call	Encrypt 
+	call    UART_Send_Package
+        call    UART_Send_Timers
+        call    UART_Send_Round_Keys
 
+        bra     Loop
+	
+    
+Session_Decrypt:
+	call	UART_Recieve_Package
+	call	Decrypt 
+	call    UART_Send_Package
+        call    UART_Send_Timers
+        call    UART_Send_Round_Keys
+
+        bra     Loop
+	
+	
+Session_Mixed:
         call    UART_Receive_Package
 
 	    ; --- Encryption timing ---
