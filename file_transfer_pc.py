@@ -6,6 +6,7 @@ from the PIC before sending the next one.
 
 import os
 import serial
+import time
 
 
 SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
@@ -228,6 +229,8 @@ class FileTransfer():
                     if not self._expect_sot(ser):
                         print("Frame error: did not receive SOT from device.")
                         return
+                    ser.flush()
+                    time.sleep(0.5)  # 50 ms, change as required
                     self._send_mode_byte(ser)
                     self._send_packet_count(ser, total_packets_to_send)
 

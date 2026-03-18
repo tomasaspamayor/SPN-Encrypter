@@ -19,11 +19,7 @@ session_mode: ds 1
 psect   const_data,class=CONST,reloc=2
 SOT_Seq:
     db      0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80
-
-psect   const_data,class=CONST,reloc=2
-EOT_Seq:
-    db      0x80, 0x4F, 0x9B, 0xD2, 0x11, 0x7E, 0xC5, 0x3A
-
+    
 psect	uart_code,class=CODE
 UART_Setup:
     bsf	    SPEN	; enable
@@ -57,6 +53,9 @@ UART_Transmit_Byte:	    ; Transmits byte stored in W
     return
 
 UART_Receive_Byte:
+    btfsc   RCSTA1, 1, A
+    call    Handle_Overrun
+    
     btfss   PIR1, 5, A           ; RC1IF = bit 5 of PIR1
     bra     UART_Receive_Byte
     movf    RCREG1, W, A
@@ -186,7 +185,7 @@ Handle_Overrun:
     bsf     RCSTA1, 4, A
     bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
     bsf     RCSTA1, 4, A
-    bra     UART_Receive_Package    ; Continue (current packet is likely corrupted)
+    return    ; Continue (current packet is likely corrupted)
 
 Handle_Framing:
     movf    RCREG1, W, A    ; Read RCREG to clear the error
