@@ -133,7 +133,8 @@ UART_Send_Round_Keys:
     return
 
 UART_Send_Timers:
-    ; Sends 4 bytes: enc_timer_low, enc_timer_high, dec_timer_low, dec_timer_high
+    ; Send exactly 4 timer bytes (enc_low, enc_high, dec_low, dec_high)
+    ; and update the running checksum ? do NOT transmit an intermediate checksum here.
     lfsr    2, encryption_timer
     movlw   4
     call    UART_Transmit_Message_With_Checksum

@@ -22,24 +22,19 @@ psect   reset_vec, class=CODE, reloc=2
 
 psect   code
 Setup:
-        call    UART_Setup          ; Initialize UART
-	; start timer for key gen
-	movlw   0b11011000      ; T08BIT=1, T0CS=0, PSA=0 (1:2 prescaler)
+        call    UART_Setup
+
+	movlw   0b11011000
 	movwf   T0CON, A
 	
 	movlw	0x00
-	movwf	key_generated, A ; initialise key generated flag to 0
+	movwf	key_generated, A
 	
-
-        ; Configure TMR1: internal clock (Fosc/4), 1:8 prescale, 16-bit r/w, OFF initially
-        ; T1CON: RD16=1, T1CKPS=11 (1:8), T1OSCEN=0, T1SYNC=0, TMR1CS=00, TMR1ON=0
-        ; T1CON: RD16=1, T1CKPS=00 (1:1), T1OSCEN=0, T1SYNC=0, TMR1CS=00, TMR1ON=0
-        ; 1 tick = 1/Fcy = 62.5 ns at 16 MHz; max range ~4 ms (well within cipher time)
-        movlw   0b10000000
-        movwf   T1CON, A
+	clrf    T1CON, A        ; Clear register
+	bsf     T1CON, 1, A     ; Set Bit 1 (RD16)
+	clrf    T1GCON, A       ; Disable gate control
 
 	bra	Loop
-        ; generate keys and start scheduling
 
 Encrypt:
         ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
@@ -134,9 +129,7 @@ Clear_Loop:
         bra     Clear_Loop
 
         call    UART_Receive_Package
-        
-
-        ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
+         ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
         movlw   0x04
         cpfseq  pkg_buffer+15, A
         bra     No_Key_Reset
@@ -146,25 +139,30 @@ Clear_Loop:
         ; if using additional EOT bytes, check here
 
 No_Key_Reset:
-        clrf    TMR1H, A
-        clrf    TMR1L, A
-        movlw   0b10000001          ; RD16=1, 1:1 prescale, TMR1ON=1 — start timer
-        movwf   T1CON, A
-        call    Encrypt
-        movlw   0b10000000          ; TMR1ON=0 — stop timer
-        movwf   T1CON, A
-        movff   TMR1L, encryption_timer
-        movff   TMR1H, encryption_timer+1
 
-        clrf    TMR1H, A
-        clrf    TMR1L, A
-        movlw   0b10000001          ; start timer
-        movwf   T1CON, A
-        call    Decrypt
-        movlw   0b10000000          ; stop timer
-        movwf   T1CON, A
-        movff   TMR1L, decryption_timer
-        movff   TMR1H, decryption_timer+1
+	    ; --- Encryption timing ---
+	bcf     T1CON, 0, A           ; Ensure TMR1ON = 0 (stop timer)
+	clrf    TMR1H, A              ; Clear high byte 
+	clrf    TMR1L, A              ; Clear low byte
+	bsf     T1CON, 0, A           ; Start Timer1 (set TMR1ON = 1)
+	call    Encrypt
+	bcf     T1CON, 0, A           ; Stop Timer1 (clear TMR1ON = 0)
+	movf    TMR1L, W, A           ; Read low (latches high when RD16=1)
+	movwf   encryption_timer, A
+	movf    TMR1H, W, A
+	movwf   encryption_timer+1, A
+
+	; --- Decryption timing ---
+	bcf     T1CON, 0, A
+	clrf    TMR1H, A
+	clrf    TMR1L, A
+	bsf     T1CON, 0, A
+	call    Decrypt
+	bcf     T1CON, 0, A
+	movf    TMR1L, W, A
+	movwf   decryption_timer, A
+	movf    TMR1H, W, A
+	movwf   decryption_timer+1, A
 
         call    UART_Send_Package
         call    UART_Send_Timers

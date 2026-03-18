@@ -10,7 +10,7 @@ extrn   Key_Buffer
 psect   const_data,class=CONST,reloc=2
 Fixed_Key_Data:
     db      'T', 'E', 'M', 'M', 'U', 'Z', 'T', 'U'
-    db      'M', 'A', 'Y', 'I', 'S', 'A', 'D'
+    db      'M', 'A', 'Y', 'I', 'S', 'A'
     
 psect   udata_acs
 TRNG_counter:   ds  1
@@ -35,7 +35,8 @@ Copy_ROM_Loop:
 
 	decfsz  TRNG_counter, F, A
 	bra     Copy_ROM_Loop
-
+	
+	movff	TMR0H, POSTINC2
 	movff   TMR0L, INDF2
 
 	return
