@@ -13,6 +13,14 @@ tx_checksum: ds 1
 session_active: ds 1
 rx_first_byte: ds 1
 key_generated: ds 1
+    
+psect   const_data,class=CONST,reloc=2
+SOT_Seq:
+    db      0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x02
+
+psect   const_data,class=CONST,reloc=2
+EOT_SEQ:
+    db      0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x66, 0xBB, 0x04
 
 psect	uart_code,class=CODE
 UART_Setup:
@@ -61,12 +69,37 @@ UART_Receive_Package:
     btfsc   session_active, 0, A
     bra     No_Key_Gen
 
-RX_Wait_SOT:
-    call    UART_Receive_Byte
-    xorlw   0x02
-    bnz     RX_Wait_SOT
-    bsf     session_active, 0, A
+RX_Wait_SOT_Init:
+    movlw   low(SOT_Seq)
+    movwf   TBLPTRL, A
+    movlw   high(SOT_Seq)
+    movwf   TBLPTRH, A
+    movlw   low(highword(SOT_Seq))
+    movwf   TBLPTRU, A
+    movlw   8
+    movwf   match_counter, A
+
+RX_Wait_Loop:
+    call    UART_Receive_Byte      
     
+    tblrd* ; read in first start of transmission byte
+    cpfseq  TABLAT, A               ; Compare W with TABLAT 
+    bra     Sequence_Failed         ; branch away if not
+
+    ; match 
+    tblrd*+                         ; increment to next expected byte
+    decfsz  match_counter, F, A     ; decrement byte count
+    bra     RX_Wait_Loop            ; if counter is not zero, wait for next byte
+
+    ; all match
+    bsf     session_active, 0, A    
+    bra     Session_Started         ; branch to receiving code
+
+Sequence_Failed:
+    ; if any byte is wrong, start again
+    bra     RX_Wait_SOT_Init
+
+Session_Started:    
     ; generate key for use if the start of the package is detected (with SOT byte currently 0x02)
     
     ; double check that no key exists for this transmission using key_generated flag
@@ -121,12 +154,44 @@ RX_Read_Checksum:
 
     return
 
-RX_Handle_EOT:
-    movlw   0x04                    ; ACK EOT to host
-    call    UART_Transmit_Byte
-    bcf     session_active, 0, A    ; reset the session flag
+RX_Wait_EOT_Init:
+    movlw   low(EOT_Seq)
+    movwf   TBLPTRL, A
+    movlw   high(EOT_Seq)
+    movwf   TBLPTRH, A
+    movlw   low(highword(EOT_Seq))
+    movwf   TBLPTRU, A
     
-    ; if end of package contains 0x04 (EOT marker), reset key generated flag to 0 for next package
+    movlw   8
+    movwf   match_counter, A
+
+RX_EOT_Loop:
+    call    UART_Receive_Byte     
+    
+    tblrd* ; read eot byte into tablat
+    
+    cpfseq  TABLAT, A               ; compare received byte with expected byte
+    bra     EOT_Sequence_Failed     ; branch off if no match
+
+    ; match
+    tblrd*+                         ; goto next expected byte
+    decfsz  match_counter, F, A     ; decrement byte count
+    bra     RX_EOT_Loop             ; if not zero, wait for next
+
+    ; all matches
+    movlw   0x04                    ; ACK the EOT to the host PC
+    call    UART_Transmit_Byte
+    
+    bcf     session_active, 0, A    ; reset the session flag
+    clrf    key_generated, A        ; clear the key flag
+    
+    bra     UART_Receive_Package    ; Go back to the very beginning to wait for a new SOT
+
+EOT_Sequence_Failed:
+    ; any failures, start again
+    bra     RX_Wait_EOT_Init
+    
+    ; if end of package contains EOT marker, reset key generated flag to 0 for next package
     movlw   0x00
     movwf   key_generated, A
     
