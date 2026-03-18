@@ -9,7 +9,6 @@ import serial
 
 
 SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
-EOT_MARKER = bytes([0x80, 0x4F, 0x9B, 0xD2, 0x11, 0x7E, 0xC5, 0x3A])
 FRAME_MARKER_SIZE = len(SOT_MARKER)
 MODE_DECRYPT_BYTE = 0x00
 MODE_ENCRYPT_BYTE = 0x01
@@ -37,7 +36,7 @@ class FileTransfer():
         timing_log_path (str): Optional path to write per-packet timing data as CSV.
         round_keys_log_path (str): Optional path to append 176-byte round-key dumps.
         round_keys_size (int): Size in bytes of the round-key payload sent by firmware.
-        use_framing (bool): If True, exchange uses SOT + (packet+checksum)*N + EOT.
+        use_framing (bool): If True, exchange uses SOT + mode-byte + (packet+checksum)*N.
         encryption_mode (bool): True for encryption mode, False for decryption mode.
     """
 
@@ -97,26 +96,28 @@ class FileTransfer():
         if self.use_framing:
             ser.write(SOT_MARKER)
 
-    def _send_eot(self, ser):
-        if self.use_framing:
-            ser.write(EOT_MARKER)
-
     def _expect_sot(self, ser):
         if not self.use_framing:
             return True
         marker = self._read_exact(ser, FRAME_MARKER_SIZE)
         return marker == SOT_MARKER
 
-    def _expect_eot(self, ser):
-        if not self.use_framing:
-            return True
-        marker = self._read_exact(ser, FRAME_MARKER_SIZE)
-        return marker == EOT_MARKER
-
     def _send_mode_byte(self, ser):
         """Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt."""
         mode_byte = MODE_ENCRYPT_BYTE if self.encryption_mode else MODE_DECRYPT_BYTE
         ser.write(bytes([mode_byte]))
+
+    def _calculate_packet_count(self, data_len):
+        """Return how many payload packets will be sent for a given data length."""
+        if data_len <= 0:
+            return 0
+        return (data_len + self.packet_size - 1) // self.packet_size
+
+    def _send_packet_count(self, ser, packet_count):
+        """Send packet count as 2 bytes (little-endian) right after mode byte."""
+        if packet_count < 0 or packet_count > 0xFFFF:
+            raise ValueError("Packet count out of range for 2-byte field (0..65535).")
+        ser.write(packet_count.to_bytes(2, byteorder='little'))
 
     def _uses_hex_text_format(self, path):
         """
@@ -192,6 +193,8 @@ class FileTransfer():
         input_mode = "hex-text" if self._uses_hex_text_format(
             self.send_path) else "binary"
         print(f"Read {len(data)} bytes from {input_mode} input file.")
+        total_packets_to_send = self._calculate_packet_count(len(data))
+        print(f"Planned packets to send: {total_packets_to_send}")
 
         ser = None
         try:
@@ -204,7 +207,6 @@ class FileTransfer():
             with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
                 bytes_written = 0
-                transfer_ok = True
 
                 key_file = None
                 if self.key_log_path:
@@ -227,6 +229,7 @@ class FileTransfer():
                         print("Frame error: did not receive SOT from device.")
                         return
                     self._send_mode_byte(ser)
+                    self._send_packet_count(ser, total_packets_to_send)
 
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i: i + self.packet_size]
@@ -251,7 +254,6 @@ class FileTransfer():
 
                     if recv_total is None or len(recv_total) < recv_total_len:
                         print(f"Timeout at packet {packet_count + 1}")
-                        transfer_ok = False
                         break
 
                     recv_packet = recv_total[:self.packet_size]
@@ -284,12 +286,6 @@ class FileTransfer():
                     packet_count += 1
                     # print(f"Exchanged packet {packet_count}")
 
-                if self.use_framing and transfer_ok:
-                    self._send_eot(ser)
-                    if not self._expect_eot(ser):
-                        print("Frame error: did not receive EOT from device.")
-                        return
-
                 if timing_file:
                     timing_file.close()
                     print(f"Timings saved to {self.timing_log_path}")
@@ -320,45 +316,6 @@ class FileTransfer():
             if ser and ser.is_open:
                 ser.close()
                 print("Serial port safely closed.")
-
-    def request_master_key(self):
-        """Request the current 16-byte master key from firmware and print it as hex."""
-        ser = None
-        try:
-            ser = serial.Serial(self.serial_port, self.baud_rate, timeout=2)
-            if self.use_framing:
-                self._send_sot(ser)
-                if not self._expect_sot(ser):
-                    print("Frame error: did not receive SOT from device.")
-                    return None
-                self._send_mode_byte(ser)
-
-            request_bytes = self._build_packet_with_checksum(KEY_REQUEST_PAYLOAD) if self.use_framing else KEY_REQUEST_PAYLOAD
-            ser.write(request_bytes)
-            key_bytes = self._read_packet_payload(ser, self.packet_size)
-
-            if self.use_framing:
-                self._send_eot(ser)
-                if not self._expect_eot(ser):
-                    print("Frame error: did not receive EOT from device.")
-                    return None
-
-            if key_bytes is None or len(key_bytes) != self.packet_size:
-                print("Error: did not receive full 16-byte key response.")
-                return None
-
-            print(f"Master key (hex): {key_bytes.hex()}")
-            return key_bytes
-
-        except serial.SerialException as e:
-            print(f"Serial Error: {e}")
-            return None
-
-        finally:
-            if ser and ser.is_open:
-                ser.close()
-                print("Serial port safely closed.")
-
 
 if __name__ == "__main__":
 
