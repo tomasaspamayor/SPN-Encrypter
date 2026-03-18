@@ -8,9 +8,9 @@ import os
 import serial
 
 
-SOT_BYTE = 0x00
-EOT_BYTE = 0xFF
-FRAME_MARKER_SIZE = 8
+SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
+EOT_MARKER = bytes([0x80, 0x4F, 0x9B, 0xD2, 0x11, 0x7E, 0xC5, 0x3A])
+FRAME_MARKER_SIZE = len(SOT_MARKER)
 MODE_ENCRYPT_BYTE = 0x01
 MODE_DECRYPT_BYTE = 0x00
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
@@ -94,23 +94,23 @@ class FileTransfer():
 
     def _send_sot(self, ser):
         if self.use_framing:
-            ser.write(bytes([SOT_BYTE]) * FRAME_MARKER_SIZE)
+            ser.write(SOT_MARKER)
 
     def _send_eot(self, ser):
         if self.use_framing:
-            ser.write(bytes([EOT_BYTE]) * FRAME_MARKER_SIZE)
+            ser.write(EOT_MARKER)
 
     def _expect_sot(self, ser):
         if not self.use_framing:
             return True
         marker = self._read_exact(ser, FRAME_MARKER_SIZE)
-        return marker == (bytes([SOT_BYTE]) * FRAME_MARKER_SIZE)
+        return marker == SOT_MARKER
 
     def _expect_eot(self, ser):
         if not self.use_framing:
             return True
         marker = self._read_exact(ser, FRAME_MARKER_SIZE)
-        return marker == (bytes([EOT_BYTE]) * FRAME_MARKER_SIZE)
+        return marker == EOT_MARKER
 
     def _send_mode_byte(self, ser):
         """Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt."""
