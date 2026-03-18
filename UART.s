@@ -125,11 +125,16 @@ Session_Started:
 Encryption_Setup:
     ; generate key for use if the start of the package is detected  
     call    Key_Setup
-    bra	    RX_Read_First
+    bra	    Session_Ready
     
 Decryption_Setup:
     call   EEPROM_Read_Buffer  ; load current key in EEPROM
-    bra	   RX_Read_First
+    bra	   Session_Ready
+
+Session_Ready:
+    movlw   0x03                    ; ACK ready for first packet
+    call    UART_Transmit_Byte
+    bra     RX_Read_First
     
 RX_Read_First:
     call    UART_Receive_Byte

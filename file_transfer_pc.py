@@ -88,7 +88,8 @@ class FileTransfer():
         recv_checksum = body[-1]
         calc_checksum = self._checksum8(payload)
         if recv_checksum != calc_checksum:
-            print(f"Frame error: checksum mismatch recv=0x{recv_checksum:02X}, calc=0x{calc_checksum:02X}")
+            print(
+                f"Frame error: checksum mismatch recv=0x{recv_checksum:02X}, calc=0x{calc_checksum:02X}")
             return None
 
         return payload
@@ -118,7 +119,8 @@ class FileTransfer():
     def _send_packet_count(self, ser, packet_count):
         """Send packet count as 2 bytes (little-endian) right after mode byte."""
         if packet_count < 0 or packet_count > 0xFFFF:
-            raise ValueError("Packet count out of range for 2-byte field (0..65535).")
+            raise ValueError(
+                "Packet count out of range for 2-byte field (0..65535).")
         ser.write(packet_count.to_bytes(2, byteorder='little'))
 
     def _uses_hex_text_format(self, path):
@@ -223,7 +225,8 @@ class FileTransfer():
                 round_keys_file = None
                 if self.round_keys_log_path:
                     # Append mode preserves all historical round-key dumps.
-                    round_keys_file = open(self.round_keys_log_path, "a", encoding="utf-8")
+                    round_keys_file = open(
+                        self.round_keys_log_path, "a", encoding="utf-8")
 
                 if self.use_framing:
                     self._send_sot(ser)
@@ -234,6 +237,10 @@ class FileTransfer():
                     time.sleep(0.5)  # 50 ms, change as required
                     self._send_mode_byte(ser)
                     self._send_packet_count(ser, total_packets_to_send)
+                    ready = self._read_exact(ser, 1)
+                    if ready != bytes([0x03]):
+                        print("Frame error: did not receive READY from device.")
+                        return
 
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i: i + self.packet_size]
@@ -249,7 +256,8 @@ class FileTransfer():
                         print(
                             "(additional packets will not be printed to avoid console overflow)")
                     tx_payload = send_packet
-                    tx_bytes = self._build_packet_with_checksum(tx_payload) if self.use_framing else tx_payload
+                    tx_bytes = self._build_packet_with_checksum(
+                        tx_payload) if self.use_framing else tx_payload
                     ser.write(tx_bytes)
 
                     # Read payload from hardware: 16 data + 4 timer bytes + 176 round-key bytes
@@ -266,7 +274,8 @@ class FileTransfer():
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
                     TICK_US = 0.25
-                    round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
+                    round_keys = recv_total[self.packet_size +
+                                            4:self.packet_size + 4 + self.round_keys_size]
                     enc_us = enc_ticks * TICK_US
                     dec_us = dec_ticks * TICK_US
                     print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
@@ -320,6 +329,7 @@ class FileTransfer():
             if ser and ser.is_open:
                 ser.close()
                 print("Serial port safely closed.")
+
 
 if __name__ == "__main__":
 
