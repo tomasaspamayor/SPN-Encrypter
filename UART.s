@@ -64,8 +64,9 @@ UART_Receive_Byte:
 UART_Receive_Package:
     bsf     RCSTA1, 4, A
 
-    btfsc   session_active, 0, A ; if session is not active
+    btfss   session_active, 0, A ; if session is not active
     bra     RX_Wait_SOT_Init	; wait for an SOT sequence
+    bra     RX_Read_First
 
 RX_Wait_SOT_Init:
     movlw   low(SOT_Seq)
