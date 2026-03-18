@@ -100,8 +100,9 @@ class FileTransfer():
     def _expect_sot(self, ser):
         if not self.use_framing:
             return True
-        marker = self._read_exact(ser, FRAME_MARKER_SIZE)
-        return marker == SOT_MARKER
+        # PIC firmware replies with a single 0x02 ACK after matching SOT.
+        ack = self._read_exact(ser, 1)
+        return ack == bytes([0x02])
 
     def _send_mode_byte(self, ser):
         """Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt."""
