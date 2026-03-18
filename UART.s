@@ -177,13 +177,12 @@ Decrement_Low:
     iorwf   packets_remaining+1, W, A ; or the high byte with W
     
     bz      Session_Complete          ; if the result is zero, have 0x0000
-    
-    bra     UART_Receive_Package      ; If not, go to next package
+    return                           ; return to main loop for processing
 
 Session_Complete:
     ; all packets recieved
     bcf     session_active, 0, A      
-    bra     UART_Receive_Package
+    return
 
 Handle_Overrun:
     bcf     RCSTA1, 4, A   ; CREN = bit 4 of RCSTA1
