@@ -8,8 +8,12 @@ import os
 import serial
 
 
-SOT_BYTE = 0x02
-EOT_BYTE = 0x04
+SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
+EOT_MARKER = bytes([0x80, 0x4F, 0x9B, 0xD2, 0x11, 0x7E, 0xC5, 0x3A])
+FRAME_MARKER_SIZE = len(SOT_MARKER)
+MODE_DECRYPT_BYTE = 0x00
+MODE_ENCRYPT_BYTE = 0x01
+MODE_BOTH_BYTE = 0x02
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
 
@@ -34,11 +38,12 @@ class FileTransfer():
         round_keys_log_path (str): Optional path to append 176-byte round-key dumps.
         round_keys_size (int): Size in bytes of the round-key payload sent by firmware.
         use_framing (bool): If True, exchange uses SOT + (packet+checksum)*N + EOT.
+        encryption_mode (bool): True for encryption mode, False for decryption mode.
     """
 
     def __init__(self, send_path, receive_path, serial_port, baud_rate=9600, packet_size=16,
                  key_log_path=None, timing_log_path=None, round_keys_log_path=None,
-                 round_keys_size=176, use_framing=True):
+                 round_keys_size=176, use_framing=True, encryption_mode=True):
         self.send_path = send_path
         self.receive_path = receive_path
         self.serial_port = serial_port
@@ -49,6 +54,7 @@ class FileTransfer():
         self.round_keys_log_path = round_keys_log_path
         self.round_keys_size = round_keys_size
         self.use_framing = use_framing
+        self.encryption_mode = bool(encryption_mode)
 
     def _checksum8(self, data):
         """Compute compact 8-bit additive checksum (sum modulo 256)."""
@@ -89,23 +95,28 @@ class FileTransfer():
 
     def _send_sot(self, ser):
         if self.use_framing:
-            ser.write(bytes([SOT_BYTE]))
+            ser.write(SOT_MARKER)
 
     def _send_eot(self, ser):
         if self.use_framing:
-            ser.write(bytes([EOT_BYTE]))
+            ser.write(EOT_MARKER)
 
     def _expect_sot(self, ser):
         if not self.use_framing:
             return True
-        marker = self._read_exact(ser, 1)
-        return len(marker) == 1 and marker[0] == SOT_BYTE
+        marker = self._read_exact(ser, FRAME_MARKER_SIZE)
+        return marker == SOT_MARKER
 
     def _expect_eot(self, ser):
         if not self.use_framing:
             return True
-        marker = self._read_exact(ser, 1)
-        return len(marker) == 1 and marker[0] == EOT_BYTE
+        marker = self._read_exact(ser, FRAME_MARKER_SIZE)
+        return marker == EOT_MARKER
+
+    def _send_mode_byte(self, ser):
+        """Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt."""
+        mode_byte = MODE_ENCRYPT_BYTE if self.encryption_mode else MODE_DECRYPT_BYTE
+        ser.write(bytes([mode_byte]))
 
     def _uses_hex_text_format(self, path):
         """
@@ -215,6 +226,7 @@ class FileTransfer():
                     if not self._expect_sot(ser):
                         print("Frame error: did not receive SOT from device.")
                         return
+                    self._send_mode_byte(ser)
 
                 for i in range(0, len(data), self.packet_size):
                     send_packet = data[i: i + self.packet_size]
@@ -247,7 +259,6 @@ class FileTransfer():
                         recv_total[self.packet_size:self.packet_size + 2], 'little')
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
-                    raw_timer_bytes = recv_total[self.packet_size:self.packet_size + 4]
                     TICK_US = 0.25
                     round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
                     enc_us = enc_ticks * TICK_US
@@ -320,6 +331,7 @@ class FileTransfer():
                 if not self._expect_sot(ser):
                     print("Frame error: did not receive SOT from device.")
                     return None
+                self._send_mode_byte(ser)
 
             request_bytes = self._build_packet_with_checksum(KEY_REQUEST_PAYLOAD) if self.use_framing else KEY_REQUEST_PAYLOAD
             ser.write(request_bytes)
@@ -352,17 +364,21 @@ if __name__ == "__main__":
 
     file_type = 0
 
-    if file_type == 0:  # Example usage: .TXT file.
+    if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
         transfer_txt = FileTransfer(send_path='tester.txt',
                                     receive_path='tester_out.txt',
                                     serial_port='COM4',
                                     timing_log_path='timings.txt',
-                                    round_keys_log_path='round_keys_history.txt')
+                                    round_keys_log_path='round_keys_history.txt',
+                                    use_framing=True,
+                                    encryption_mode=True)
         transfer_txt.file_exchange()
-    else:  # Example usage: .JPG file.
+    else:  # Example usage: .JPG file, encryption mode, with framing and logging.
         transfer_jpg = FileTransfer(send_path='tester.jpg',
                                     receive_path='tester_out.jpg',
                                     serial_port='COM4',
                                     timing_log_path='timings.txt',
-                                    round_keys_log_path='round_keys_history.txt')
+                                    round_keys_log_path='round_keys_history.txt',
+                                    use_framing=True,
+                                    encryption_mode=True)
         transfer_jpg.file_exchange()
