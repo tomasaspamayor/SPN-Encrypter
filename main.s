@@ -22,25 +22,19 @@ psect   reset_vec, class=CODE, reloc=2
 
 psect   code
 Setup:
-        call    UART_Setup          ; Initialize UART
-	; start timer for key gen
-	movlw   0b11011000      ; T08BIT=1, T0CS=0, PSA=0 (1:2 prescaler)
+        call    UART_Setup
+
+	movlw   0b11011000
 	movwf   T0CON, A
 	
 	movlw	0x00
-	movwf	key_generated, A ; initialise key generated flag to 0
+	movwf	key_generated, A
 	
-
-        ; Configure TMR1: internal clock (Fosc/4), 1:1 prescale, 16-bit r/w, OFF initially
-        ; T1CON: RD16=1, T1CKPS=00 (1:1), T1OSCEN=0, T1SYNC=0, TMR1CS=00, TMR1ON=0
-        ; T1GCON: TMR1GE=0 (disable gate), allow timer to count freely
-        ; 1 tick = 1/Fcy = 62.5 ns at 16 MHz; max range ~4 ms (well within cipher time)
-        movlw   0b10000000
-        movwf   T1CON, A
-        clrf    T1GCON, A           ; Disable gate; timer can now count
+	clrf    T1CON, A        ; Clear register
+	bsf     T1CON, 1, A     ; Set Bit 1 (RD16)
+	clrf    T1GCON, A       ; Disable gate control
 
 	bra	Loop
-        ; generate keys and start scheduling
 
 Encrypt:
         ; generate key for use
@@ -124,26 +118,26 @@ Clear_Loop:
 
         call    UART_Receive_Package
 
-	clrf    TMR1H, A            ; Clear BEFORE starting
-	clrf    TMR1L, A
-	movlw   0b10000001          ; Start Timer (TMR1ON=1)
-	movwf   T1CON, A
+	    ; --- Encryption timing ---
+	bcf     T1CON, 0, A           ; Ensure TMR1ON = 0 (stop timer)
+	clrf    TMR1H, A              ; Clear high byte 
+	clrf    TMR1L, A              ; Clear low byte
+	bsf     T1CON, 0, A           ; Start Timer1 (set TMR1ON = 1)
 	call    Encrypt
-	movlw   0b10000000          ; Stop Timer (TMR1ON=0)
-	movwf   T1CON, A
-	movf    TMR1L, W, A         ; Read Low (Latches High)
+	bcf     T1CON, 0, A           ; Stop Timer1 (clear TMR1ON = 0)
+	movf    TMR1L, W, A           ; Read low (latches high when RD16=1)
 	movwf   encryption_timer, A
-	movf    TMR1H, W, A         ; Read High from buffer
+	movf    TMR1H, W, A
 	movwf   encryption_timer+1, A
 
+	; --- Decryption timing ---
+	bcf     T1CON, 0, A
 	clrf    TMR1H, A
 	clrf    TMR1L, A
-	movlw   0b10000001          ; Start Timer (TMR1ON=1)
-	movwf   T1CON, A
+	bsf     T1CON, 0, A
 	call    Decrypt
-	movlw   0b10000000          ; Stop Timer (TMR1ON=0)
-	movwf   T1CON, A
-	movf    TMR1L, W, A         ; Read Low (Latches High)
+	bcf     T1CON, 0, A
+	movf    TMR1L, W, A
 	movwf   decryption_timer, A
 	movf    TMR1H, W, A
 	movwf   decryption_timer+1, A

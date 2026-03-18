@@ -247,9 +247,11 @@ class FileTransfer():
                         recv_total[self.packet_size:self.packet_size + 2], 'little')
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
+                    raw_timer_bytes = recv_total[self.packet_size:self.packet_size + 4]
+                    TICK_US = 0.25
                     round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
-                    enc_us = enc_ticks * 0.0625
-                    dec_us = dec_ticks * 0.0625
+                    enc_us = enc_ticks * TICK_US
+                    dec_us = dec_ticks * TICK_US
                     print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
                           f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks) "
                           f"[raw: {recv_total[self.packet_size:self.packet_size+4].hex()}]")
