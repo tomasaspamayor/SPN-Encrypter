@@ -258,7 +258,6 @@ class FileTransfer():
                         recv_total[self.packet_size:self.packet_size + 2], 'little')
                     dec_ticks = int.from_bytes(
                         recv_total[self.packet_size + 2:self.packet_size + 4], 'little')
-                    raw_timer_bytes = recv_total[self.packet_size:self.packet_size + 4]
                     TICK_US = 0.25
                     round_keys = recv_total[self.packet_size + 4:self.packet_size + 4 + self.round_keys_size]
                     enc_us = enc_ticks * TICK_US
