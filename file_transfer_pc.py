@@ -345,7 +345,7 @@ class FileTransfer():
 
 
 if __name__ == "__main__":
-    for i in range(1):
+    for i in range(10000):
         file_type = 0
 
         if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
@@ -355,7 +355,7 @@ if __name__ == "__main__":
                                         timing_log_path='timings.txt',
                                         round_keys_log_path='round_keys_history.txt',
                                         use_framing=True,
-                                        encryption_mode=False)
+                                        encryption_mode=True)
             transfer_txt.file_exchange()
         else:  # Example usage: .JPG file, encryption mode, with framing and logging.
             transfer_jpg = FileTransfer(send_path='tester.jpg',

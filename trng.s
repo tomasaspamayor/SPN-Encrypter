@@ -26,7 +26,7 @@ Generate_Master_Key:
 	movlw   low(highword(Fixed_Key_Data))
 	movwf   TBLPTRU, A
 
-	movlw   14
+	movlw   15
 	movwf   TRNG_counter, A
 
 Copy_ROM_Loop:
