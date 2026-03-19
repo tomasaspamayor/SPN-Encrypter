@@ -23,8 +23,8 @@ class FileTransfer():
     sending data to the PIC, receiving responses, and writing responses to a local file.
     The class also includes error handling for common issues that may arise during the process.
 
-    Files ending in .txt are interpreted as hexadecimal text dumps. Any other file type,
-    including .jpg, is transferred as raw binary data.
+    Files ending in .txt are interpreted as hexadecimal text dumps. BMP files are handled
+    with selective pixel-data encryption (header preserved). Other files are transferred as raw binary.
 
     Attributes:
         send_path (str): Path to the local file to send to the PIC.
@@ -134,6 +134,29 @@ class FileTransfer():
         """
         return os.path.splitext(path)[1].lower() == ".txt"
 
+    def _uses_bmp_format(self, path):
+        """Return True for BMP files that can use selective pixel-data encryption."""
+        return os.path.splitext(path)[1].lower() == ".bmp"
+
+    def _parse_bmp_header(self, data: bytes):
+        """
+        Parse BMP header and return (header_bytes, pixel_data_offset, pixel_data).
+        Raises ValueError if not a valid BMP or file is truncated.
+        """
+        if len(data) < 26:
+            raise ValueError("File too small for BMP header")
+        if data[0:2] != b'BM':
+            raise ValueError("Not a BMP file (missing BM signature)")
+        
+        # Offset to pixel data is stored at bytes 10-13 (little-endian)
+        pixel_offset = int.from_bytes(data[10:14], 'little')
+        if pixel_offset < 14 or pixel_offset > len(data):
+            raise ValueError(f"Invalid pixel offset {pixel_offset}")
+        
+        header = data[:pixel_offset]
+        pixel_data = data[pixel_offset:]
+        return header, pixel_offset, pixel_data
+
     def _read_input_data(self):
         """
         Reads the input data from the file specified by send_path.
@@ -193,10 +216,27 @@ class FileTransfer():
             print("Error: Input file contains invalid hex characters.")
             return
 
+        # Detect BMP and extract pixel data for selective encryption
+        is_bmp = False
+        bmp_header = b''
+        payload = data
+        
+        if not self._uses_hex_text_format(self.send_path):
+            ext = os.path.splitext(self.send_path)[1].lower()
+            if ext == '.bmp' and data[:2] == b'BM':
+                try:
+                    bmp_header, _, pixel_data = self._parse_bmp_header(data)
+                    is_bmp = True
+                    payload = pixel_data
+                    print(f"BMP detected: header size {len(bmp_header)} bytes, pixel data {len(pixel_data)} bytes")
+                except ValueError as e:
+                    print(f"BMP parse error: {e}. Falling back to whole file encryption.")
+                    payload = data
+
         input_mode = "hex-text" if self._uses_hex_text_format(
-            self.send_path) else "binary"
+            self.send_path) else ("bmp" if is_bmp else "binary")
         print(f"Read {len(data)} bytes from {input_mode} input file.")
-        total_packets_to_send = self._calculate_packet_count(len(data))
+        total_packets_to_send = self._calculate_packet_count(len(payload))
         print(f"Planned packets to send: {total_packets_to_send}")
 
         ser = None
@@ -206,6 +246,9 @@ class FileTransfer():
             output_mode = 'w' if self._uses_hex_text_format(
                 self.receive_path) else 'wb'
             output_kwargs = {"encoding": "utf-8"} if output_mode == 'w' else {}
+            
+            # Buffer for BMP pixel data reconstruction
+            bmp_recv_pixels = bytearray() if is_bmp else None
 
             with open(self.receive_path, output_mode, **output_kwargs) as f_recv:
                 packet_count = 0
@@ -301,16 +344,19 @@ class FileTransfer():
                     if round_keys_file:
                         round_keys_file.write(round_keys.hex() + "\n")
 
-                    packet_to_write = recv_packet
-                    if not self._uses_hex_text_format(self.receive_path):
-                        remaining_bytes = len(data) - bytes_written
-                        packet_to_write = recv_packet[:remaining_bytes]
-
-                    self._write_output_packet(f_recv, packet_to_write)
-                    bytes_written += len(packet_to_write)
+                    # For BMP, buffer pixel bytes; for others, write directly
+                    if is_bmp:
+                        bmp_recv_pixels.extend(recv_packet)
+                        bytes_written += len(recv_packet)
+                    else:
+                        packet_to_write = recv_packet
+                        if not self._uses_hex_text_format(self.receive_path):
+                            remaining_bytes = len(data) - bytes_written
+                            packet_to_write = recv_packet[:remaining_bytes]
+                        self._write_output_packet(f_recv, packet_to_write)
+                        bytes_written += len(packet_to_write)
 
                     packet_count += 1
-                    # print(f"Exchanged packet {packet_count}")
 
                 if timing_file:
                     timing_file.close()
@@ -323,6 +369,16 @@ class FileTransfer():
                 if key_file:
                     key_file.close()
                     print(f"Keys saved to {self.key_log_path}")
+                
+                # For BMP: write reconstructed file with original header + encrypted/decrypted pixels
+                if is_bmp and bmp_recv_pixels is not None:
+                    with open(self.receive_path, 'wb') as out_bmp:
+                        out_bmp.write(bmp_header)
+                        # Write only the received pixel bytes (up to original pixel data length)
+                        orig_pixel_len = len(payload)
+                        pixel_slice = bytes(bmp_recv_pixels)[:orig_pixel_len]
+                        out_bmp.write(pixel_slice)
+                    print(f"Reconstructed BMP written to {self.receive_path}")
 
                 print(f"Exchange complete. {packet_count} packets processed.")
 
@@ -345,24 +401,32 @@ class FileTransfer():
 
 
 if __name__ == "__main__":
-    for i in range(1):
-        file_type = 1
+    file_type = 2
 
-        if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
-            transfer_txt = FileTransfer(send_path='tester.txt',
-                                        receive_path='tester_out.txt',
+    if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
+        transfer_txt = FileTransfer(send_path='tester.txt',
+                                    receive_path='tester_out.txt',
+                                    serial_port='COM4',
+                                    timing_log_path='timings.txt',
+                                    round_keys_log_path='round_keys_history.txt',
+                                    use_framing=True,
+                                    encryption_mode=True)
+        transfer_txt.file_exchange()
+    elif file_type == 1:  # Example usage: .TXT file, decryption mode.
+        transfer_txt_dec = FileTransfer(send_path='tester_out.txt',
+                                        receive_path='tester_out_dec.txt',
                                         serial_port='COM4',
                                         timing_log_path='timings.txt',
                                         round_keys_log_path='round_keys_history.txt',
                                         use_framing=True,
                                         encryption_mode=False)
-            transfer_txt.file_exchange()
-        else:  # Example usage: .JPG file, encryption mode, with framing and logging.
-            transfer_jpg = FileTransfer(send_path='tester.jpg',
-                                        receive_path='tester_out.jpg',
-                                        serial_port='COM4',
-                                        timing_log_path='timings.txt',
-                                        round_keys_log_path='round_keys_history.txt',
-                                        use_framing=True,
-                                        encryption_mode=True)
-            transfer_jpg.file_exchange()
+        transfer_txt_dec.file_exchange()
+    else:  # Example usage: .BMP file, encryption mode, with selective pixel-data encryption.
+        transfer_bmp = FileTransfer(send_path='tester.bmp',
+                                    receive_path='tester_encrypted.bmp',
+                                    serial_port='COM4',
+                                    timing_log_path='timings.txt',
+                                    round_keys_log_path='round_keys_history.txt',
+                                    use_framing=True,
+                                    encryption_mode=True)
+        transfer_bmp.file_exchange()
