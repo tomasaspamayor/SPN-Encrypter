@@ -9,8 +9,8 @@ extrn   Key_Buffer
 
 psect   const_data,class=CONST,reloc=2
 Fixed_Key_Data:
-    db      'T', 'E', 'M', 'M', 'U', 'Z', 'T', 'U'
-    db      'M', 'A', 'Y', 'I', 'S', 'A'
+    db	    0b01011001, 'E', 'M', 'M', 'U', 'Z', 'T', 'U'
+    db      'M', 'A', 'Y', 'I', 'S', 'A', '1', '2'
     
 psect   udata_acs
 TRNG_counter:   ds  1
@@ -26,7 +26,7 @@ Generate_Master_Key:
 	movlw   low(highword(Fixed_Key_Data))
 	movwf   TBLPTRU, A
 
-	movlw   15
+	movlw   16
 	movwf   TRNG_counter, A
 
 Copy_ROM_Loop:
@@ -36,7 +36,7 @@ Copy_ROM_Loop:
 	decfsz  TRNG_counter, F, A
 	bra     Copy_ROM_Loop
 	
-	movff   TMR0L, POSTINC2 
-	movff   TMR0H, INDF2    
+;	movff   TMR0L, POSTINC2 
+;	movff   TMR0H, INDF2    
 
 	return

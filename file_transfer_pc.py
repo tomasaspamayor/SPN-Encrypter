@@ -11,8 +11,8 @@ import time
 
 SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
 FRAME_MARKER_SIZE = len(SOT_MARKER)
-MODE_DECRYPT_BYTE = 0x02
-MODE_ENCRYPT_BYTE = 0x02
+MODE_DECRYPT_BYTE = 0x01
+MODE_ENCRYPT_BYTE = 0x01
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
 
@@ -337,8 +337,8 @@ class FileTransfer():
 
 
 if __name__ == "__main__":
-    for i in range(10000):
-        file_type = 0
+    for i in range(1):
+        file_type = 1
 
         if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
             transfer_txt = FileTransfer(send_path='tester.txt',

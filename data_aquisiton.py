@@ -165,7 +165,7 @@ def plot_process_rates(input_sizes_bytes, rates_list):
 if __name__ == "__main__":
     generate_test_data(100)
 
-    keys_df = pd.read_csv("keys.txt", header=None)
+    keys_df = pd.read_csv("shannon_entropy.txt", header=None)
     cipher_df = pd.read_csv("tester_out.txt", header=None)
 
     ciphertexts_binary = cipher_df[0].astype(str).apply(to_bin).tolist()
