@@ -219,7 +219,8 @@ class FileTransfer():
                 if self.timing_log_path:
                     timing_file = open(self.timing_log_path,
                                        "w", encoding="utf-8")
-                    timing_file.write("packet,encrypt_us,decrypt_us\n")
+                    timing_file.write(
+                        "packet,encrypt_us,decrypt_us,transaction_us,throughput_mb_s\n")
 
                 round_keys_file = None
                 if self.round_keys_log_path:
@@ -282,13 +283,20 @@ class FileTransfer():
                     enc_us = enc_ticks * TICK_US
                     dec_us = dec_ticks * TICK_US
                     txn_us = (txn_end - txn_start) * 1_000_000.0
+                    txn_s = txn_us / 1_000_000.0
+                    rx_wire_bytes = recv_total_len + \
+                        (1 if self.use_framing else 0)
+                    wire_bytes = len(tx_bytes) + rx_wire_bytes
+                    throughput_mb_s = (
+                        wire_bytes / 1_000_000.0) / txn_s if txn_s > 0 else 0.0
                     print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
                           f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks), "
-                          f"transaction: {txn_us:.2f} \u00b5s "
+                          f"transaction: {txn_us:.2f} \u00b5s, "
+                          f"throughput: {throughput_mb_s:.3f} MB/s "
                           f"[raw: {recv_total[self.packet_size:self.packet_size+4].hex()}]")
                     if timing_file:
                         timing_file.write(
-                            f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f}\n")
+                            f"{packet_count + 1},{enc_us:.1f},{dec_us:.1f},{txn_us:.1f},{throughput_mb_s:.3f}\n")
 
                     if round_keys_file:
                         round_keys_file.write(round_keys.hex() + "\n")
