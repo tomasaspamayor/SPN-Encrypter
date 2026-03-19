@@ -257,14 +257,18 @@ class FileTransfer():
                     tx_payload = send_packet
                     tx_bytes = self._build_packet_with_checksum(
                         tx_payload) if self.use_framing else tx_payload
+                    txn_start = time.perf_counter()
                     ser.write(tx_bytes)
 
                     # Read payload from hardware: 16 data + 4 timer bytes + 176 round-key bytes
                     recv_total_len = self.packet_size + 4 + self.round_keys_size
                     recv_total = self._read_packet_payload(ser, recv_total_len)
+                    txn_end = time.perf_counter()
 
                     if recv_total is None or len(recv_total) < recv_total_len:
-                        print(f"Timeout at packet {packet_count + 1}")
+                        txn_us = (txn_end - txn_start) * 1_000_000.0
+                        print(
+                            f"Timeout at packet {packet_count + 1} (transaction {txn_us:.2f} us)")
                         break
 
                     recv_packet = recv_total[:self.packet_size]
@@ -277,8 +281,10 @@ class FileTransfer():
                                             4:self.packet_size + 4 + self.round_keys_size]
                     enc_us = enc_ticks * TICK_US
                     dec_us = dec_ticks * TICK_US
+                    txn_us = (txn_end - txn_start) * 1_000_000.0
                     print(f"  Packet {packet_count + 1} timings \u2014 encrypt: {enc_us:.2f} \u00b5s ({enc_ticks} ticks), "
-                          f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks) "
+                          f"decrypt: {dec_us:.2f} \u00b5s ({dec_ticks} ticks), "
+                          f"transaction: {txn_us:.2f} \u00b5s "
                           f"[raw: {recv_total[self.packet_size:self.packet_size+4].hex()}]")
                     if timing_file:
                         timing_file.write(
