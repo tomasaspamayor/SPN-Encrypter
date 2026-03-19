@@ -230,8 +230,13 @@ class FileTransfer():
                     print("Critical Error: Conversion failed to uncompress file. Aborting.")
                     return
                 is_bmp = True
-            except Exception as e:
-                print(f"BMP Conversion/Check Error: {e}. Attempting raw transfer.")
+
+            except (FileNotFoundError, PermissionError) as e:
+                print(f"File Access Error: Check if the file is open in another program. {e}")
+                return # Stop here because we can't read the file at all
+            except ValueError as e:
+                print(f"Data Error: {e}. Falling back to raw transfer.")
+                is_bmp = False
 
         # 2. READ DATA: Load the (now fixed) file into RAM
         try:
@@ -359,8 +364,24 @@ class FileTransfer():
                         out_bmp.write(bytes(bmp_recv_pixels)[:len(payload)])
                     print(f"Reconstructed BMP saved to: {self.receive_path}")
 
+        except serial.SerialException as e:
+            print(f"\n[Hardware Error] Serial communication failed: {e}")
+            print("Check your USB cable and COM port settings.")
+
+        except (FileNotFoundError, PermissionError) as e:
+            print(f"\n[File Error] Could not access the drive: {e}")
+
+        except ValueError as e:
+            print(f"\n[Data Error] Hex conversion or BMP parsing failed: {e}")
+
+        except KeyboardInterrupt:
+            print("\n[User Abort] Process interrupted by user (Ctrl+C).")
+
         except Exception as e:
-            print(f"\nAn error occurred during exchange: {e}")
+            # This is now truly for 'unexpected' bugs only
+            print(f"\n[Unexpected Bug] An unhandled error occurred: {e}")
+            raise # Re-raise so you can see the full Traceback for debugging
+
         finally:
             if ser and ser.is_open:
                 ser.close()
