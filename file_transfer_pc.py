@@ -5,13 +5,12 @@ from the PIC before sending the next one.
 """
 
 import os
-import serial
 import time
-
+import serial
 
 SOT_MARKER = bytes([0x3A, 0xC5, 0x7E, 0x11, 0xD2, 0x9B, 0x4F, 0x80])
 FRAME_MARKER_SIZE = len(SOT_MARKER)
-MODE_DECRYPT_BYTE = 0x01
+MODE_DECRYPT_BYTE = 0x00
 MODE_ENCRYPT_BYTE = 0x01
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
@@ -285,11 +284,11 @@ class FileTransfer():
                         print("Frame error: did not receive READY from device.")
                         return
 
-                for i in range(0, len(data), self.packet_size):
-                    send_packet = data[i: i + self.packet_size]
+                for i in range(0, len(payload), self.packet_size):
+                    send_packet = payload[i: i + self.packet_size]
+                    
                     if len(send_packet) < self.packet_size:
-                        send_packet = send_packet.ljust(
-                            self.packet_size, b'\x00')
+                        send_packet = send_packet.ljust(self.packet_size, b'\x00')
 
                     # Send raw bytes to hardware
                     if packet_count < 10:
@@ -344,15 +343,16 @@ class FileTransfer():
                     if round_keys_file:
                         round_keys_file.write(round_keys.hex() + "\n")
 
-                    # For BMP, buffer pixel bytes; for others, write directly
                     if is_bmp:
                         bmp_recv_pixels.extend(recv_packet)
-                        bytes_written += len(recv_packet)
+                        # No need to increment bytes_written here, handled at the end
                     else:
                         packet_to_write = recv_packet
                         if not self._uses_hex_text_format(self.receive_path):
+                            # Trim padding for raw binary files
                             remaining_bytes = len(data) - bytes_written
                             packet_to_write = recv_packet[:remaining_bytes]
+                        
                         self._write_output_packet(f_recv, packet_to_write)
                         bytes_written += len(packet_to_write)
 
