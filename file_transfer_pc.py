@@ -331,24 +331,24 @@ class FileTransfer():
 
 
 if __name__ == "__main__":
+    for i in range(10000):
+        file_type = 0
 
-    file_type = 0
-
-    if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
-        transfer_txt = FileTransfer(send_path='tester.txt',
-                                    receive_path='tester_out.txt',
-                                    serial_port='COM4',
-                                    timing_log_path='timings.txt',
-                                    round_keys_log_path='round_keys_history.txt',
-                                    use_framing=True,
-                                    encryption_mode=False)
-        transfer_txt.file_exchange()
-    else:  # Example usage: .JPG file, encryption mode, with framing and logging.
-        transfer_jpg = FileTransfer(send_path='tester.jpg',
-                                    receive_path='tester_out.jpg',
-                                    serial_port='COM4',
-                                    timing_log_path='timings.txt',
-                                    round_keys_log_path='round_keys_history.txt',
-                                    use_framing=True,
-                                    encryption_mode=True)
-        transfer_jpg.file_exchange()
+        if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
+            transfer_txt = FileTransfer(send_path='tester.txt',
+                                        receive_path='tester_out.txt',
+                                        serial_port='COM4',
+                                        timing_log_path='timings.txt',
+                                        round_keys_log_path='round_keys_history.txt',
+                                        use_framing=True,
+                                        encryption_mode=False)
+            transfer_txt.file_exchange()
+        else:  # Example usage: .JPG file, encryption mode, with framing and logging.
+            transfer_jpg = FileTransfer(send_path='tester.jpg',
+                                        receive_path='tester_out.jpg',
+                                        serial_port='COM4',
+                                        timing_log_path='timings.txt',
+                                        round_keys_log_path='round_keys_history.txt',
+                                        use_framing=True,
+                                        encryption_mode=True)
+            transfer_jpg.file_exchange()
