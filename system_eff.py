@@ -1,6 +1,5 @@
 import csv
 import math
-from pathlib import Path
 
 PAYLOAD_BYTES = 16
 BYTES_PER_MB = 1_000_000  # decimal MB

@@ -176,7 +176,7 @@ def plot_positional_entropy(entropies, max_entropy, unit_label):
     plt.plot(positions, entropies, color="#1f77b4", linewidth=2)
     plt.axhline(y=max_entropy, color="#e76f51", linestyle="--",
                 label=f"Max {max_entropy:.0f} bits")
-    plt.title(f"Positional Shannon Entropy per {unit_label} (All Entries)")
+    plt.title(f"Positional Shannon Entropy per {unit_label}")
     plt.xlabel(f"{unit_label.title()} Position")
     plt.ylabel("Entropy (bits)")
     tick_step = 8 if unit_label == "byte" else 16
