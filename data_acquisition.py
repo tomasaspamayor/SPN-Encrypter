@@ -4,6 +4,9 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from matplotlib import patheffects
+from matplotlib.legend_handler import HandlerTuple
+
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.6)
 
@@ -99,27 +102,59 @@ def hamming_distance_series_percent(file_paths):
         results.append((file_a, file_b, percent))
     return results
 
-
 def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0):
-    """
-    Plots Hamming distance percentages with target and mean reference lines.
-    """
-    labels = [f"{i+1}->{i+2}" for i in range(len(hamming_results))]
+    labels = [f"{i+1} $\\to$ {i+2}" for i in range(len(hamming_results))]
     percents = [percent for _, _, percent in hamming_results]
 
-    plt.figure(figsize=(10, 5))
-    plt.bar(labels, percents, color="#2a9d8f", alpha=0.8)
-    plt.axhline(y=target_percent, color="#e76f51", linestyle="--",
-                label=f"Target {target_percent:.0f}%")
-    plt.axhline(y=mean_percent, color="#264653", linestyle="-",
-                label=f"Mean {mean_percent:.2f}%")
-    plt.title("Hamming Distance (% of Total File Size)")
-    plt.xlabel("Adjacent Key Pair")
-    plt.ylabel("Hamming Distance (%)")
-    plt.legend()
+    plt.rcParams['font.family'] = 'serif'
+    _, ax = plt.subplots(figsize=(10, 5))
+
+    std_dev = np.std(percents)
+    sem = std_dev / np.sqrt(len(percents))
+
+    target_line = ax.axhline(y=target_percent, color="black", linestyle="--", 
+                             linewidth=1, zorder=1, label=f"Ideal Target ({target_percent}%)")
+
+    mean_line = ax.axhline(y=mean_percent, color="gray", linestyle="-", linewidth=1.5, zorder=1)
+    uncertainty_span = ax.axhspan(mean_percent - sem, mean_percent + sem, 
+                                  color='lightgray', alpha=0.3, zorder=0)
+
+    bars = ax.bar(labels, percents, color="#4D4D4D", edgecolor="black",
+                  linewidth=1.2, width=0.7, zorder=2)
+
+    for bar in bars:
+        height = bar.get_height()
+        t = ax.annotate(f'{height:.1f}%',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 8),
+                        textcoords="offset points",
+                        ha='center', va='bottom', 
+                        fontsize=20, fontweight='bold', zorder=3)
+        t.set_path_effects([patheffects.withStroke(linewidth=3, foreground='white')])
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(axis="y", linestyle=':', alpha=0.4, color='lightgray', zorder=0)
+    ax.set_ylim(target_percent - 1, target_percent + 1)
+
+    ax.set_title("Adjacent Hamming Distance Analysis", fontsize=25, pad=10)
+    ax.set_xlabel("Adjacent Key Pair", fontsize=20)
+    ax.set_ylabel("Hamming Distance (%)", fontsize=20)
+    ax.tick_params(axis='both', labelsize=17.5)
+
+    handles = [target_line, (mean_line, uncertainty_span)]
+    labels_text = [f"Ideal Target ({target_percent}%)", 
+                   f"Calculated Mean ({mean_percent:.2f}% ± {sem:.2f}%)"]
+
+    ax.legend(handles=handles, 
+              labels=labels_text,
+              loc="upper right", 
+              frameon=False, 
+              fontsize=12,
+              handler_map={tuple: HandlerTuple(ndivide=None)})
+
     plt.tight_layout()
     plt.show()
-
 
 def shannon_entropy_from_counts(counts):
     """
@@ -169,20 +204,31 @@ def positional_entropy_across_entries(hex_lines, unit="byte"):
 
 def plot_positional_entropy(entropies, max_entropy, unit_label):
     """
-    Plots positional entropy across all entries for a given unit.
+    Plots positional entropy with a formal, academic grayscale aesthetic.
     """
     positions = list(range(len(entropies)))
-    plt.figure(figsize=(12, 5))
-    plt.plot(positions, entropies, color="#1f77b4", linewidth=2)
-    plt.axhline(y=max_entropy, color="#e76f51", linestyle="--",
-                label=f"Max {max_entropy:.0f} bits")
-    plt.title(f"Positional Shannon Entropy per {unit_label}")
-    plt.xlabel(f"{unit_label.title()} Position")
-    plt.ylabel("Entropy (bits)")
+
+    plt.rcParams['font.family'] = 'serif'
+
+    _, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(positions, entropies, color="black", linewidth=1.2, label="Measured Entropy")
+
+    ax.axhline(y=max_entropy, color="gray", linestyle=(0, (5, 5)),
+                linewidth=1, label=f"Theoretical Max ({max_entropy:.0f} bits)")
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_title(f"Positional Shannon Entropy per {unit_label}",
+              fontsize=25,
+              pad=10)
+    ax.set_xlabel(f"{unit_label.title()} Position", fontsize=15)
+    ax.set_ylabel("Entropy (bits)", fontsize=15)
     tick_step = 8 if unit_label == "byte" else 16
-    plt.xticks(range(0, len(entropies), tick_step))
-    plt.grid(True, axis="y", alpha=0.3)
-    plt.legend()
+    ax.set_xticks(range(0, len(entropies), tick_step))
+    ax.grid(axis="y", linestyle=':', alpha=0.6, color='lightgray')
+    ax.legend(loc="lower right", frameon=False, fontsize=15)
+
     plt.tight_layout()
     plt.show()
 
@@ -212,9 +258,9 @@ def positional_entropy():
     byte_entropies = positional_entropy_across_entries(lines, unit="byte")
     if byte_entropies:
         plot_positional_entropy(
-            byte_entropies, max_entropy=8.0, unit_label="byte")
+            byte_entropies, max_entropy=8.0, unit_label="Byte")
 
 
 if __name__ == "__main__":
-    # hamming()
+    hamming()
     positional_entropy()
