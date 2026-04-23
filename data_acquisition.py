@@ -137,10 +137,10 @@ def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0)
     ax.grid(axis="y", linestyle=':', alpha=0.4, color='lightgray', zorder=0)
     ax.set_ylim(target_percent - 1, target_percent + 1)
 
-    ax.set_title("Adjacent Hamming Distance Analysis", fontsize=25, pad=10)
-    ax.set_xlabel("Adjacent Key Pair", fontsize=20)
-    ax.set_ylabel("Hamming Distance (%)", fontsize=20)
-    ax.tick_params(axis='both', labelsize=17.5)
+    ax.set_title("Adjacent Hamming Distance Analysis", fontsize=40, pad=10)
+    ax.set_xlabel("Adjacent Key Pair", fontsize=35)
+    ax.set_ylabel("Hamming Distance (%)", fontsize=35)
+    ax.tick_params(axis='both', labelsize=25)
 
     handles = [target_line, (mean_line, uncertainty_span)]
     labels_text = [f"Ideal Target ({target_percent}%)", 
@@ -150,7 +150,7 @@ def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0)
               labels=labels_text,
               loc="upper right", 
               frameon=False, 
-              fontsize=12,
+              fontsize=25,
               handler_map={tuple: HandlerTuple(ndivide=None)})
 
     plt.tight_layout()
@@ -219,15 +219,16 @@ def plot_positional_entropy(entropies, max_entropy, unit_label):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
-    ax.set_title(f"Positional Shannon Entropy per {unit_label}",
-              fontsize=25,
+    ax.tick_params(axis='both', which='major', labelsize=25)
+    ax.set_title(f"Positional Shannon Entropy per Round Keys {unit_label}",
+              fontsize=40,
               pad=10)
-    ax.set_xlabel(f"{unit_label.title()} Position", fontsize=15)
-    ax.set_ylabel("Entropy (bits)", fontsize=15)
+    ax.set_xlabel(f"{unit_label.title()} Position", fontsize=35)
+    ax.set_ylabel("Entropy (bits)", fontsize=35)
     tick_step = 8 if unit_label == "byte" else 16
     ax.set_xticks(range(0, len(entropies), tick_step))
     ax.grid(axis="y", linestyle=':', alpha=0.6, color='lightgray')
-    ax.legend(loc="lower right", frameon=False, fontsize=15)
+    ax.legend(loc="lower right", frameon=False, fontsize=25)
 
     plt.tight_layout()
     plt.show()
@@ -250,7 +251,6 @@ def hamming():
         plot_hamming_percentages(
             hamming_results, mean_percent, target_percent=50.0)
 
-
 def positional_entropy():
     with open("data/round_keys_history.txt", "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
@@ -262,5 +262,5 @@ def positional_entropy():
 
 
 if __name__ == "__main__":
-    hamming()
+    #hamming()
     positional_entropy()
