@@ -15,11 +15,11 @@ EEPROM_Write_Buffer:
         bsf	EECON1, 2, A	; enable write (WREN bit 2)
 
         MOVLW   0x00
-        movwf   EEADRH, A   ; upper address
+        movwf   EEADRH, A       ; upper address
         movlw   0x00
-        movwf   EEADR, A
+        movwf   EEADR, A        ; lower address
 
-        movlw	0x10
+        movlw	0x10            ; number of bytes to write
         movwf	eeprom_counter, A
         lfsr	0, Key_Buffer	; move key buffer to fsr0
 	
@@ -48,23 +48,23 @@ Write_Loop:
 
 EEPROM_Read_Buffer:
         movlw   0x00
-        movwf   EEADRH, A   ; upper address
+        movwf   EEADRH, A       ; upper address
         movlw   0x00 
-        movwf   EEADR, A    ; lower address
+        movwf   EEADR, A        ; lower address
 
-        movlw   0x10
+        movlw   0x10            ; number of bytes to read
         movwf   eeprom_counter, A
 
         lfsr    0, Key_Buffer
 
-        bcf     EECON1, 7, A   ;(EEPGD bit 7)
-        bcf     EECON1, 6, A   ; (CFGS bit 6)
+        bcf     EECON1, 7, A    ;(EEPGD bit 7)
+        bcf     EECON1, 6, A    ; (CFGS bit 6)
 
 Read_Loop:
         bsf     EECON1, 0, A	; start read (RD - bit 0)
         nop     
-        movf    EEDATA, W, A   ; move data into W
-        movwf   POSTINC0, A ; move W into fsr0
+        movf    EEDATA, W, A    ; move data into W
+        movwf   POSTINC0, A     ; move W into fsr0
 
         incf    EEADR, F, A
         decfsz  eeprom_counter, F, A

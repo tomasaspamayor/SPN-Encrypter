@@ -1,4 +1,5 @@
 #include <xc.inc>
+; P-Box transformation module for AES encryption. Applies ShiftRows and MixColumns operations to 16-byte plaintext blocks. Dependencies: pkg_buffer (16-byte data state), GF_X2 macro.
 
 global  P_Box_Enc, Shift_Rows, Mix_All_Columns
 extrn   pkg_buffer
@@ -17,27 +18,34 @@ count_h: ds 1
 count_l: ds 1
 cnt_ms: ds 1
     
-temp_buffer_enc: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
-res_byte_enc: ds 1	; Temporary variable to hold results during MixColumns
-col_count_enc: ds 1	; Column counter for Mix_All_Columns
-copy_count_enc: ds 1 ; Counter for copy-back loop
-t0_e: ds 1	; Temporary variable for MixColumns
+temp_buffer_enc: ds 16	    ; temporary buffer for ShiftRows operation (16 bytes)
+res_byte_enc: ds 1	        ; Temporary variable to hold results during MixColumns
+col_count_enc: ds 1	        ; Column counter for Mix_All_Columns
+copy_count_enc: ds 1        ; Counter for copy-back loop
+; Temporary variables for MixColumns
+t0_e: ds 1	
 t1_e: ds 1
 t2_e: ds 1
 t3_e: ds 1
 
 psect	uart_code, class=CODE
 
-P_Box_Enc: 
+P_Box_Enc:
+        ; Applies P-Box (ShiftRows then MixColumns) to pkg_buffer in-place.
+        ; Dependencies: Shift_Rows, Mix_All_Columns.
         call    Shift_Rows
         call	Mix_All_Columns
         return 
 
 Shift_Rows:
-    ; first, clear the temporary buffer
-	lfsr    0, temp_buffer_enc
+        ; Applies ShiftRows transformation (cyclic row left shifts) to pkg_buffer in-place.
+        ; Dependencies: pkg_buffer, temp_buffer_enc.
+
+        ; first, clear the temporary buffer
+	    lfsr    0, temp_buffer_enc
         movlw   16
         movwf   copy_count_enc, A
+        
     Clear_temp_buffer_enc:
         clrf    POSTINC0, A
         decfsz  copy_count_enc, F, A
@@ -87,6 +95,8 @@ Shift_Rows:
 
 ; ---------------------------------------------------------------------------------------------------------------------
 Mix_All_Columns:
+        ; Applies MixColumns transformation to all 4 columns of pkg_buffer. Updates pkg_buffer in-place.
+        ; Dependencies: Mix_Column, GF_X2 macro, temp_buffer_enc.
         lfsr    0, pkg_buffer       ; FSR0 = input (pkg_buffer)
         lfsr    1, temp_buffer_enc      ; FSR1 = output (temp_buffer_enc)
         movlw   4
@@ -112,6 +122,8 @@ Mix_All_Columns:
 
 ; reads 4 bytes from FSR0, writes output 4 bytes to FSR1
 Mix_Column:
+        ; Computes MixColumns matrix multiplication (2,3,1,1 coefficients) on one column. Uses FSR0/FSR1 pointers.
+        ; Dependencies: GF_X2 macro, t0_e-t3_e, res_byte_enc registers.
         ; read in first column
         movff   POSTINC0, t0_e    ; t0_e = byte 0
         movff   POSTINC0, t1_e    ; t1_e = byte 1

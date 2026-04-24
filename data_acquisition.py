@@ -13,9 +13,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-from matplotlib import patheffects
-from matplotlib.legend_handler import HandlerTuple
+from matplotlib.patches import Rectangle
 
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.6)
@@ -46,6 +44,7 @@ def generate_test_data(rows=100):
     pd.Series(tester).to_csv("tester.txt", index=False, header=False)
     pd.Series(tester_out).to_csv("tester_out.txt", index=False, header=False)
 
+
 def to_bin(hex_str):
     """
     Converts a hex string to a binary string, ensuring it is 1408 bits (352 hex characters) 
@@ -59,6 +58,7 @@ def to_bin(hex_str):
     except ValueError:
         return "0" * 1408
 
+
 def calculate_hamming_distance(str1, str2):
     """
     Calculates the Hamming distance between two binary strings.
@@ -68,6 +68,7 @@ def calculate_hamming_distance(str1, str2):
         str2 (str): Second binary string.
     """
     return sum(el1 != el2 for el1, el2 in zip(str1, str2))
+
 
 def calculate_hamming_distance_percent(str1, str2):
     """
@@ -84,6 +85,7 @@ def calculate_hamming_distance_percent(str1, str2):
     dist = calculate_hamming_distance(str1, str2)
     return (dist / len(str1)) * 100.0
 
+
 def hex_to_bin_any(hex_str):
     """
     Converts a hex string to a binary string without fixed padding.
@@ -99,6 +101,7 @@ def hex_to_bin_any(hex_str):
     except ValueError as exc:
         raise ValueError("Invalid hex string.") from exc
 
+
 def load_ciphertext_file_hex(path):
     """
     Loads a ciphertext file with one hex string per line and concatenates.
@@ -108,6 +111,7 @@ def load_ciphertext_file_hex(path):
     """
     series = pd.read_csv(path, header=None, dtype=str)[0].dropna()
     return "".join(series.tolist())
+
 
 def hamming_distance_file_percent(file_a, file_b):
     """
@@ -125,6 +129,7 @@ def hamming_distance_file_percent(file_a, file_b):
     bin_b = hex_to_bin_any(hex_b)
     return calculate_hamming_distance_percent(bin_a, bin_b)
 
+
 def hamming_distance_series_percent(file_paths):
     """
     Computes Hamming distance percentages for adjacent file pairs.
@@ -139,67 +144,78 @@ def hamming_distance_series_percent(file_paths):
         results.append((file_a, file_b, percent))
     return results
 
+
 def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0):
     """
-    Plots Hamming distance percentages with a formal, academic grayscale aesthetic.
-    Args:        
-        hamming_results (list of tuples): Results from hamming_distance_series_percent.
-        mean_percent (float): The average Hamming distance percentage across all pairs.
-        target_percent (float): The ideal target Hamming distance percentage
-        (default is 50% for random data).
+    Plots Hamming distance percentages with target and mean reference lines.
+    Highlights bars with more than one actual bit flip from the key generation.
     """
-    labels = [f"{i+1} $\\to$ {i+2}" for i in range(len(hamming_results))]
+    labels = [f"{i+1}→{i+2}" for i in range(len(hamming_results))]
     percents = [percent for _, _, percent in hamming_results]
 
-    plt.rcParams['font.family'] = 'serif'
-    _, ax = plt.subplots(figsize=(10, 5))
+    # Key pairs with more than one bit flip: indices 1, 3, 5, 7 (2→3, 4→5, 6→7, 8→9)
+    multi_bit_flip_indices = {1, 3, 5, 7}
 
-    std_dev = np.std(percents)
-    sem = std_dev / np.sqrt(len(percents))
+    # Calculate standard error for confidence band
+    se_percent = float(np.std(percents, ddof=1) /
+                       np.sqrt(len(percents))) if len(percents) > 1 else 0.0
 
-    target_line = ax.axhline(y=target_percent, color="black", linestyle="--",
-                             linewidth=1, zorder=1, label=f"Ideal Target ({target_percent}%)")
+    fig, ax = plt.subplots(figsize=(12, 5))
 
-    mean_line = ax.axhline(y=mean_percent, color="gray", linestyle="-", linewidth=1.5, zorder=1)
-    uncertainty_span = ax.axhspan(mean_percent - sem, mean_percent + sem,
-                                  color='lightgray', alpha=0.3, zorder=0)
+    # Plot bars with conditional coloring
+    bars = []
+    for idx, (label, percent) in enumerate(zip(labels, percents)):
+        color = "#e76f51" if idx in multi_bit_flip_indices else "#2a9d8f"
+        bar = ax.bar(label, percent, color=color, alpha=0.8)
+        bars.extend(bar)
 
-    bars = ax.bar(labels, percents, color="#4D4D4D", edgecolor="black",
-                  linewidth=1.2, width=0.7, zorder=2)
+    # Add value labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'{height:.1f}%',
+                ha='center', va='bottom', fontsize=14, fontweight='bold')
 
-    for bar_val in bars:
-        height = bar_val.get_height()
-        t = ax.annotate(f'{height:.1f}%',
-                        xy=(bar_val.get_x() + bar_val.get_width() / 2, height),
-                        xytext=(0, 8),
-                        textcoords="offset points",
-                        ha='center', va='bottom',
-                        fontsize=20, fontweight='bold', zorder=3)
-        t.set_path_effects([patheffects.withStroke(linewidth=3, foreground='white')])
+    # Add shaded confidence region around the target line
+    ax.axhspan(mean_percent - se_percent, mean_percent + se_percent,
+               alpha=0.15, color="#264653", zorder=-1)
 
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis="y", linestyle=':', alpha=0.4, color='lightgray', zorder=0)
-    ax.set_ylim(target_percent - 1, target_percent + 1)
+    # Add reference lines
+    ax.axhline(y=target_percent, color="#e76f51", linestyle="--", linewidth=2, alpha=0.5,
+               label=f"Target ({target_percent:.1f}%)", zorder=2)
+    ax.axhline(y=mean_percent, color="#264653", linestyle="-", linewidth=2, alpha=0.5,
+               label=f"Mean ({mean_percent:.2f}% ± {se_percent:.2f}%)", zorder=2)
 
-    ax.set_title("Adjacent Hamming Distance Analysis", fontsize=40, pad=10)
-    ax.set_xlabel("Adjacent Key Pair", fontsize=35)
-    ax.set_ylabel("Hamming Distance (%)", fontsize=35)
-    ax.tick_params(axis='both', labelsize=25)
+    # Set title and labels
+    ax.set_title("Adjacent Hamming Distance Analysis",
+                 fontsize=19, fontweight='bold')
+    ax.set_xlabel("Adjacent Key Pair", fontsize=15)
+    ax.set_ylabel("Hamming Distance (%)", fontsize=15)
 
-    handles = [target_line, (mean_line, uncertainty_span)]
-    labels_text = [f"Ideal Target ({target_percent}%)",
-                   f"Calculated Mean ({mean_percent:.2f}% ± {sem:.2f}%)"]
+    # Set y-axis limits with some padding
+    ax.set_ylim(min(percents) - 1, max(percents) + 2)
 
-    ax.legend(handles=handles,
-              labels=labels_text,
-              loc="upper right",
-              frameon=False,
-              fontsize=25,
-              handler_map={tuple: HandlerTuple(ndivide=None)})
+    # Styling
+    ax.tick_params(axis='both', which='major', labelsize=13)
+
+    # Add legend patches for bar colors
+    single_bit_patch = Rectangle((0, 0), 1, 1, alpha=0.8, color="#2a9d8f",
+                                 label="Single Bit Flip")
+    multi_bit_patch = Rectangle((0, 0), 1, 1, alpha=0.8, color="#e76f51",
+                                label="Multiple Bit Flips")
+    uncertainty_patch = Rectangle((0, 0), 1, 1, alpha=0.15, color="#264653",
+                                  label="±1 Standard Error")
+
+    handles, labels_list = ax.get_legend_handles_labels()
+    handles.extend([single_bit_patch, multi_bit_patch, uncertainty_patch])
+    ax.legend(handles=handles, loc='upper right', fontsize=13)
+
+    ax.grid(True, axis='y', alpha=0.3)
+    ax.set_axisbelow(True)
 
     plt.tight_layout()
     plt.show()
+
 
 def shannon_entropy_from_counts(counts):
     """
@@ -213,6 +229,7 @@ def shannon_entropy_from_counts(counts):
         return 0.0
     probs = counts[counts > 0] / total
     return float(-np.sum(probs * np.log2(probs)))
+
 
 def positional_entropy_across_entries(hex_lines, unit="byte"):
     """
@@ -252,6 +269,7 @@ def positional_entropy_across_entries(hex_lines, unit="byte"):
         entropies.append(shannon_entropy_from_counts(counts))
     return entropies
 
+
 def plot_positional_entropy(entropies, max_entropy, unit_label):
     """
     Plots positional entropy with a formal, academic grayscale aesthetic.
@@ -266,18 +284,19 @@ def plot_positional_entropy(entropies, max_entropy, unit_label):
     plt.rcParams['font.family'] = 'serif'
 
     _, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(positions, entropies, color="black", linewidth=1.2, label="Measured Entropy")
+    ax.plot(positions, entropies, color="black",
+            linewidth=1.2, label="Measured Entropy")
 
     ax.axhline(y=max_entropy, color="gray", linestyle=(0, (5, 5)),
-                linewidth=1, label=f"Theoretical Max ({max_entropy:.0f} bits)")
+               linewidth=1, label=f"Theoretical Max ({max_entropy:.0f} bits)")
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
     ax.tick_params(axis='both', which='major', labelsize=25)
     ax.set_title(f"Positional Shannon Entropy per Round Keys {unit_label}",
-              fontsize=40,
-              pad=10)
+                 fontsize=40,
+                 pad=10)
     ax.set_xlabel(f"{unit_label.title()} Position", fontsize=35)
     ax.set_ylabel("Entropy (bits)", fontsize=35)
     tick_step = 8 if unit_label == "byte" else 16
@@ -290,6 +309,7 @@ def plot_positional_entropy(entropies, max_entropy, unit_label):
 
 # Main functions to run the analyses and generate plots.
 # These wrap the previous functions into a singular workflow.
+
 
 def hamming():
     """
@@ -310,6 +330,7 @@ def hamming():
         print(f"Standard error: {se_percent:.4f}%")
         plot_hamming_percentages(
             hamming_results, mean_percent, target_percent=50.0)
+
 
 def shannon():
     """

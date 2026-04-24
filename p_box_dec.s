@@ -1,19 +1,22 @@
 #include <xc.inc>
+; Inverse P-Box transformation module for AES decryption. Applies inverse ShiftRows and inverse MixColumns operations to 16-byte ciphertext blocks. Dependencies: pkg_buffer (16-byte data state), lookup tables.
 
 global  Unshift_Rows, Unmix_All_Columns, P_Box_Dec
 extrn   pkg_buffer
 
 psect	udata_acs
-temp_buffer_dec: ds 16	; temporary buffer for ShiftRows operation (16 bytes)
-res_byte_dec: ds 1 ; Temporary variable to hold results during UnmixColumns
-col_count_dec: ds 1 ; Column counter for Unmix_All_Columns
-copy_count_dec: ds 1 ; Counter for copy-back loop
-t0_d: ds 1 ; Temporary variable for UnmixColumns
-t1_d: ds 1
+temp_buffer_dec: ds 16	        ; temporary buffer for ShiftRows operation (16 bytes)
+res_byte_dec: ds 1              ; Temporary variable to hold results during UnmixColumns
+col_count_dec: ds 1             ; Column counter for Unmix_All_Columns
+copy_count_dec: ds 1            ; Counter for copy-back loop
+; Temporary variables for UnmixColumns
+t0_d: ds 1 
+t1_d: ds 1  
 t2_d: ds 1
 t3_d: ds 1
 
 psect const_data, class=CONST, space=0, reloc=256
+; Inverse MixColumns transformation tables, indexed by the byte to be multiplied
 Mult9_Table: db 0x00,0x09,0x12,0x1b,0x24,0x2d,0x36,0x3f,0x48,0x41,0x5a,0x53,0x6c,0x65,0x7e,0x77
     db 0x90,0x99,0x82,0x8b,0xb4,0xbd,0xa6,0xaf,0xd8,0xd1,0xca,0xc3,0xfc,0xf5,0xee,0xe7
     db 0x3b,0x32,0x29,0x20,0x1f,0x16,0x0d,0x04,0x73,0x7a,0x61,0x68,0x57,0x5e,0x45,0x4c
@@ -82,17 +85,20 @@ Mult14_Table: db 0x00,0x0e,0x1c,0x12,0x38,0x36,0x24,0x2a,0x70,0x7e,0x6c,0x62,0x4
     db 0x37,0x39,0x2b,0x25,0x0f,0x01,0x13,0x1d,0x47,0x49,0x5b,0x55,0x7f,0x71,0x63,0x6d
     db 0xd7,0xd9,0xcb,0xc5,0xef,0xe1,0xf3,0xfd,0xa7,0xa9,0xbb,0xb5,0x9f,0x91,0x83,0x8d
 
-; these tables can be found at https://en.wikipedia.org/wiki/Rijndael_MixColumns
+; ^^^ these tables can be found at https://en.wikipedia.org/wiki/Rijndael_MixColumns ^^^
 
 psect aes_code, class=CODE
 
 P_Box_Dec:
+        ; Applies inverse P-Box (InvShiftRows then InvMixColumns) to pkg_buffer in-place.
+        ; Dependencies: Unmix_All_Columns, Unshift_Rows.
         call	Unmix_All_Columns
         call    Unshift_Rows
         return
 
-Multiply_By_9: ; w holds the byte to be multiplied by 9
-
+Multiply_By_9:
+        ; Multiplies byte in W by 9 in GF(2^8) via Mult9_Table lookup. Result in W.
+        ; Dependencies: Mult9_Table.
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
         movlw   low(highword(Mult9_Table))
@@ -106,8 +112,9 @@ Multiply_By_9: ; w holds the byte to be multiplied by 9
         movf    TABLAT, W, A    ; W now holds the result of byte * 9
         return
 
-Multiply_By_11: ; w holds the byte to be multiplied by 11
-
+Multiply_By_11:
+        ; Multiplies byte in W by 11 in GF(2^8) via Mult11_Table lookup. Result in W.
+        ; Dependencies: Mult11_Table.
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
         movlw   low(highword(Mult11_Table))
@@ -121,8 +128,9 @@ Multiply_By_11: ; w holds the byte to be multiplied by 11
         movf    TABLAT, W, A    ; W now holds the result of byte * 11
         return
 
-Multiply_By_13: ; w holds the byte to be multiplied by 13
-
+Multiply_By_13:
+        ; Multiplies byte in W by 13 in GF(2^8) via Mult13_Table lookup. Result in W.
+        ; Dependencies: Mult13_Table.
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
         movlw   low(highword(Mult13_Table))
@@ -136,8 +144,9 @@ Multiply_By_13: ; w holds the byte to be multiplied by 13
         movf    TABLAT, W, A    ; W now holds the result of byte * 13
         return
 
-Multiply_By_14: ; w holds the byte to be multiplied by 14
-
+Multiply_By_14:
+        ; Multiplies byte in W by 14 in GF(2^8) via Mult14_Table lookup. Result in W.
+        ; Dependencies: Mult14_Table.
         movwf   TBLPTRL, A ; store the input byte in TBLPTRL for table lookup
 
         movlw   low(highword(Mult14_Table))
@@ -152,11 +161,11 @@ Multiply_By_14: ; w holds the byte to be multiplied by 14
         return
 
 
-; TEST ABOVE
-
-Unshift_Rows: ; TEST
-    ; first, clear the temporary buffer
-	lfsr    0, temp_buffer_dec
+Unshift_Rows:
+        ; Reverses the InvShiftRows transformation (cyclic row shifts right become left). Updates pkg_buffer in-place.
+        ; Dependencies: pkg_buffer, temp_buffer_dec.
+        ; first, clear the temporary buffer
+	    lfsr    0, temp_buffer_dec
         movlw   16
         movwf   copy_count_dec, A
     Clear_temp_buffer_dec:
@@ -206,7 +215,9 @@ Unshift_Rows: ; TEST
 
         return
 
-Unmix_All_Columns: ;TEST
+Unmix_All_Columns:
+        ; Applies inverse MixColumns transformation to all 4 columns of pkg_buffer. Updates pkg_buffer in-place.
+        ; Dependencies: Unmix_Column, Multiply_By_9/11/13/14, temp_buffer_dec.
         lfsr    0, pkg_buffer       ; FSR0 = input (pkg_buffer)
         lfsr    1, temp_buffer_dec      ; FSR1 = output (temp_buffer_dec)
         movlw   4
@@ -231,6 +242,8 @@ Unmix_All_Columns: ;TEST
         return
 
 Unmix_Column:
+        ; Computes inverse MixColumns matrix multiplication (14,11,13,9 coefficients) on one column. Uses FSR0/FSR1 pointers.
+        ; Dependencies: Multiply_By_9/11/13/14, t0_d-t3_d, res_byte_dec registers.
         ; read in first column
         movff   POSTINC0, t0_d    ; t0_d = byte 0
         movff   POSTINC0, t1_d    ; t1_d = byte 1
