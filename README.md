@@ -100,8 +100,7 @@ A hardware-based cryptographic device implementing AES encryption and decryption
 
 ## Contributors
 
-- **Louis Liu** - Assembly implementation, cryptanalysis, documentation
-- **Tomàs Aspa Mayor** - Architecture design, testing, PC utilities
+- **Louis Liu, Tomàs Aspa Mayor** 
 
 ---
 
