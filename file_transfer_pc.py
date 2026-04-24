@@ -15,6 +15,7 @@ MODE_DECRYPT_BYTE = 0x00
 MODE_ENCRYPT_BYTE = 0x01
 KEY_REQUEST_PAYLOAD = bytes([0xAA, 0x55, 0x4B, 0x45, 0x59] + [0x00] * 11)
 
+## WARNING: This code works for TXT files only. For the BMP methods, checkout to feat/bmp branch.
 
 class FileTransfer():
     """
@@ -22,9 +23,6 @@ class FileTransfer():
     connection. It covers the PC's point of view, including reading from a local file,
     sending data to the PIC, receiving responses, and writing responses to a local file.
     The class also includes error handling for common issues that may arise during the process.
-
-    Files ending in .txt are interpreted as hexadecimal text dumps. Any other file type,
-    including .jpg, is transferred as raw binary data.
 
     Attributes:
         send_path (str): Path to the local file to send to the PIC.
@@ -56,16 +54,41 @@ class FileTransfer():
         self.encryption_mode = bool(encryption_mode)
 
     def _checksum8(self, data):
-        """Compute compact 8-bit additive checksum (sum modulo 256)."""
+        """
+        Compute compact 8-bit additive checksum (sum modulo 256).
+        
+        Args:
+            data: The bytes for which to compute the checksum.
+        
+        Returns:
+            int: Integer representing the 8-bit checksum of the input data.
+        """
         return sum(data) & 0xFF
 
     def _build_packet_with_checksum(self, payload):
-        """Build one packet unit as payload + 8-bit additive checksum."""
+        """
+        Build one packet unit as payload + 8-bit additive checksum.
+        
+        Args:
+            payload: The raw bytes of the packet payload (e.g., 16 bytes for data).
+        
+        Returns:
+            bytes: The packet with checksum appended.
+        """
         checksum = self._checksum8(payload)
         return payload + bytes([checksum])
 
     def _read_exact(self, ser, size):
-        """Read exactly 'size' bytes from serial or return what was available."""
+        """
+        Read exactly 'size' bytes from serial or return what was available.
+        
+        Args:
+            ser: An open serial.Serial instance to read from.
+            size: The exact number of bytes to read.
+        
+        Returns:
+            bytes: The data read from the serial port.
+        """
         data = bytearray()
         while len(data) < size:
             chunk = ser.read(size - len(data))
@@ -75,7 +98,17 @@ class FileTransfer():
         return bytes(data)
 
     def _read_packet_payload(self, ser, payload_len):
-        """Read one packet payload and validate trailing checksum."""
+        """
+        Read one packet payload and validate trailing checksum.
+        
+        Args:
+            ser: An open serial.Serial instance to read from.
+            payload_len: The expected length of the payload in bytes (excluding checksum).
+
+        Returns:
+            bytes or None: The payload if checksum is valid, or None if there was a 
+                           framing error or timeout.
+        """
         if not self.use_framing:
             return self._read_exact(ser, payload_len)
 
@@ -94,10 +127,24 @@ class FileTransfer():
         return payload
 
     def _send_sot(self, ser):
+        """
+        Send Start-of-Transmission (SOT) marker.
+
+        Args:
+            ser: An open serial.Serial instance to write to.
+        """
         if self.use_framing:
             ser.write(SOT_MARKER)
 
     def _expect_sot(self, ser):
+        """
+        Expect SOT marker from device and return True if it matches.
+        
+        Args:
+            ser: An open serial.Serial instance to read from.
+        Returns:
+            bool: True if the SOT marker is received, False otherwise.
+        """
         if not self.use_framing:
             return True
         # PIC firmware replies with a single 0x02 ACK after matching SOT.
@@ -105,18 +152,40 @@ class FileTransfer():
         return ack == bytes([0x02])
 
     def _send_mode_byte(self, ser):
-        """Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt."""
+        """
+        Send one mode byte after SOT handshake: 0x01 encrypt, 0x00 decrypt.
+        
+        Args:
+            ser: An open serial.Serial instance to write to.
+        """
         mode_byte = MODE_ENCRYPT_BYTE if self.encryption_mode else MODE_DECRYPT_BYTE
         ser.write(bytes([mode_byte]))
 
     def _calculate_packet_count(self, data_len):
-        """Return how many payload packets will be sent for a given data length."""
+        """
+        Return how many payload packets will be sent for a given data length.
+        
+        Args:
+            data_len: The total length of the data to be sent in bytes.
+
+        Returns:
+            int: The number of packets needed to send the data, based on the packet size.
+        """
         if data_len <= 0:
             return 0
         return (data_len + self.packet_size - 1) // self.packet_size
 
     def _send_packet_count(self, ser, packet_count):
-        """Send packet count as 2 bytes (little-endian) right after mode byte."""
+        """
+        Send packet count as 2 bytes (little-endian) right after mode byte.
+        
+        Args:
+            ser: An open serial.Serial instance to write to.
+            packet_count (int): The number of packets to send.
+
+        Raises:
+            ValueError: If packet_count is negative or exceeds 65535 (max for 2 bytes).
+        """
         if packet_count < 0 or packet_count > 0xFFFF:
             raise ValueError(
                 "Packet count out of range for 2-byte field (0..65535).")
@@ -129,6 +198,7 @@ class FileTransfer():
 
         Args:
             path (str): The file path to check.
+
         Returns:
             bool: True if the file should be treated as a hexadecimal text dump, False otherwise.
         """
@@ -345,24 +415,11 @@ class FileTransfer():
 
 
 if __name__ == "__main__":
-    for i in range(10000):
-        file_type = 0
-
-        if file_type == 0:  # Example usage: .TXT file, encryption mode, with framing and logging.
-            transfer_txt = FileTransfer(send_path='tester.txt',
-                                        receive_path='tester_out.txt',
-                                        serial_port='COM4',
-                                        timing_log_path='timings.txt',
-                                        round_keys_log_path='round_keys_history.txt',
-                                        use_framing=True,
-                                        encryption_mode=True)
-            transfer_txt.file_exchange()
-        else:  # Example usage: .JPG file, encryption mode, with framing and logging.
-            transfer_jpg = FileTransfer(send_path='tester.jpg',
-                                        receive_path='tester_out.jpg',
-                                        serial_port='COM4',
-                                        timing_log_path='timings.txt',
-                                        round_keys_log_path='round_keys_history.txt',
-                                        use_framing=True,
-                                        encryption_mode=True)
-            transfer_jpg.file_exchange()
+    transfer_txt = FileTransfer(send_path='tester.txt',
+                                receive_path='tester_out.txt',
+                                serial_port='COM4',
+                                timing_log_path='timings.txt',
+                                round_keys_log_path='round_keys_history.txt',
+                                use_framing=True,
+                                encryption_mode=True)
+    transfer_txt.file_exchange()
