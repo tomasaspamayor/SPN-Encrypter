@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 sns.set_style("whitegrid")
-sns.set_context("paper", font_scale=1.6)
+sns.set_context("paper", font_scale=3.2)
 
 
 def generate_test_data(rows=100):
@@ -100,23 +100,64 @@ def hamming_distance_series_percent(file_paths):
     return results
 
 
-def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0):
+def plot_hamming_percentages(hamming_results, mean_percent, target_percent=50.0, se_percent=0.0):
     """
     Plots Hamming distance percentages with target and mean reference lines.
     """
-    labels = [f"{i+1}->{i+2}" for i in range(len(hamming_results))]
+    labels = [f"{i+1}→{i+2}" for i in range(len(hamming_results))]
     percents = [percent for _, _, percent in hamming_results]
 
-    plt.figure(figsize=(10, 5))
-    plt.bar(labels, percents, color="#2a9d8f", alpha=0.8)
+    plt.figure(figsize=(12, 5))
+
+    # Alternate bar colors with labels
+    single_flip_color = "#2a9d8f"
+    multiple_flip_color = "#e76f51"
+    colors = [single_flip_color if i % 2 == 0 else multiple_flip_color
+              for i in range(len(labels))]
+
+    bars = plt.bar(labels, percents, color=colors, alpha=0.8)
+
+    # Add percentage labels on top of each bar
+    for bar, percent in zip(bars, percents):
+        height = bar.get_height()
+        ax_temp = plt.gca()
+        ax_temp.text(bar.get_x() + bar.get_width()/2., height,
+                     f'{percent:.1f}%', ha='center', va='bottom', fontsize=21, weight='bold')
+
+    # Add shaded region for ±1 standard error
+    if se_percent > 0:
+        plt.axhspan(mean_percent - se_percent, mean_percent + se_percent,
+                    alpha=0.2, color="gray")
+
     plt.axhline(y=target_percent, color="#e76f51", linestyle="--",
-                label=f"Target {target_percent:.0f}%")
-    plt.axhline(y=mean_percent, color="#264653", linestyle="-",
-                label=f"Mean {mean_percent:.2f}%")
-    plt.title("Hamming Distance (% of Total File Size)")
-    plt.xlabel("Adjacent Key Pair")
-    plt.ylabel("Hamming Distance (%)")
-    plt.legend()
+                label=f"Target ({target_percent:.1f}%)")
+    plt.axhline(y=mean_percent, color="#264653", linestyle="-", linewidth=2, alpha=0.8,
+                label=f"Mean ({mean_percent:.2f}% ± {se_percent:.2f}%)")
+
+    # Rescale y-axis so mean is in the middle
+    plt.ylim(48.5, 52.5)
+    plt.yticks(np.arange(48.5, 52.6, 0.5))
+
+    # Add custom legend entries for bar colors and lines
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=single_flip_color, alpha=0.8, label="Single Bit Flip"),
+        Patch(facecolor=multiple_flip_color,
+              alpha=0.8, label="Multiple Bit Flips"),
+        plt.Line2D([0], [0], color="#e76f51", linestyle="--",
+                   label=f"Target ({target_percent:.1f}%)"),
+        plt.Line2D([0], [0], color="#264653", linestyle="-", linewidth=2,
+                   label=f"Mean ({mean_percent:.2f}% ± {se_percent:.2f}%)"),
+    ]
+
+    if se_percent > 0:
+        legend_elements.append(
+            Patch(facecolor="gray", alpha=0.2, label="±1 Standard Error"))
+
+    plt.legend(handles=legend_elements, loc="upper right", ncol=2)
+
+    plt.xlabel("Adjacent Key Pair", fontweight="bold")
+    plt.ylabel("Hamming Distance (%)", fontweight="bold")
     plt.tight_layout()
     plt.show()
 
@@ -172,17 +213,47 @@ def plot_positional_entropy(entropies, max_entropy, unit_label):
     Plots positional entropy across all entries for a given unit.
     """
     positions = list(range(len(entropies)))
-    plt.figure(figsize=(12, 5))
-    plt.plot(positions, entropies, color="#1f77b4", linewidth=2)
-    plt.axhline(y=max_entropy, color="#e76f51", linestyle="--",
-                label=f"Max {max_entropy:.0f} bits")
-    plt.title(f"Positional Shannon Entropy per {unit_label}")
-    plt.xlabel(f"{unit_label.title()} Position")
-    plt.ylabel("Entropy (bits)")
-    tick_step = 8 if unit_label == "byte" else 16
-    plt.xticks(range(0, len(entropies), tick_step))
-    plt.grid(True, axis="y", alpha=0.3)
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    # Fill area under curve for visual appeal
+    ax.fill_between(positions, entropies, alpha=0.25,
+                    color="#2a9d8f", label="Entropy Distribution")
+
+    # Main entropy line
+    ax.plot(positions, entropies, color="#2a9d8f",
+            linewidth=2.5, label="Positional Entropy")
+
+    # Max entropy reference line
+    ax.axhline(y=max_entropy, color="#e76f51", linestyle="--", linewidth=2.5, alpha=0.8,
+               label=f"Maximum Entropy ({max_entropy:.1f} bits)")
+
+    # Styling
+    ax.set_xlabel(f"{unit_label.title()} Position",
+                  fontsize=32, fontweight="bold")
+    ax.set_ylabel("Entropy (bits)", fontsize=32, fontweight="bold")
+
+    # Better grid
+    ax.grid(True, alpha=0.5, linestyle="--", linewidth=1.2)
+    ax.set_axisbelow(True)
+
+    # X-axis ticks
+    tick_step = 15
+    ax.set_xticks(range(0, len(entropies), tick_step))
+    ax.tick_params(axis="both", labelsize=20)
+
+    # Y-axis formatting
+    ax.set_ylim(0, max_entropy * 1.05)
+
+    # Legend with better positioning
+    ax.legend(loc="lower right", fontsize=28,
+              framealpha=0.95, edgecolor="black")
+
+    # Spines styling
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_linewidth(1.5)
+    ax.spines["bottom"].set_linewidth(1.5)
+
     plt.tight_layout()
     plt.show()
 
@@ -202,7 +273,7 @@ def hamming():
         print(f"Average Hamming distance: {mean_percent:.4f}%")
         print(f"Standard error: {se_percent:.4f}%")
         plot_hamming_percentages(
-            hamming_results, mean_percent, target_percent=50.0)
+            hamming_results, mean_percent, target_percent=50.0, se_percent=se_percent)
 
 
 def positional_entropy():
@@ -216,5 +287,5 @@ def positional_entropy():
 
 
 if __name__ == "__main__":
-    # hamming()
-    positional_entropy()
+    hamming()
+    # positional_entropy()
