@@ -19,7 +19,7 @@ A hardware-based cryptographic device implementing AES encryption and decryption
 ## Directory Structure
 
 ### Core Assembly Source Files
-- **main.s** - Entry point and main control flow
+- **main_pic.s** - Entry point and main control flow
 - **config.s** - Microprocessor configuration and setup
 - **UART.s** - Serial communication protocol (USB interface)
 - **sbox.s** - S-Box lookup tables for AES SubBytes step
@@ -49,7 +49,8 @@ A hardware-based cryptographic device implementing AES encryption and decryption
 ### Analysis and Utilities
 - **images/** - Supporting images and diagrams
 - **data_acquisition.py** - Python script for collecting performance/timing data
-- **file_transfer_pc.py** - PC-side interface for USB communication with microcontroller
+- **main_pc_txt.py** - PC-side interface for USB communication with microcontroller, used for .TXT files encryption.
+- **main_pc_bmp.py** - PC-side interface for USB communication with microcontroller, used for .BMP files encryption.
 - **system_eff.py** - System efficiency analysis tool
 
 ### Configuration and Documentation
