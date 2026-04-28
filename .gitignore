@@ -27,3 +27,5 @@ cmake/*
 *.jpg
 *.txt
 data/*
+hamming/*
+images/*
